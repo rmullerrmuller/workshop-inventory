@@ -822,25 +822,47 @@ async function searchItems(query) {
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching…</div>';
 
   try {
-    // Search items by name (case insensitive)
     const encoded = encodeURIComponent(`%${query}%`);
-    const res = await supaFetch(
-      `/rest/v1/items?select=item_name,box_id,boxes(box_id,location,description,box_image_url)&item_name=ilike.${encoded}&limit=80`
-    );
-    const data = await res.json();
 
-    if (!data.length) {
+    // Run both searches in parallel: items by name AND boxes by ID/description
+    const [itemsRes, boxesRes] = await Promise.all([
+      supaFetch(`/rest/v1/items?select=item_name,box_id,boxes(box_id,location,description,box_image_url)&item_name=ilike.${encoded}&limit=80`),
+      supaFetch(`/rest/v1/boxes?or=(box_id.ilike.${encoded},description.ilike.${encoded},location.ilike.${encoded})&limit=20`)
+    ]);
+
+    const itemData = await itemsRes.json();
+    const boxData = await boxesRes.json();
+
+    // If searching for a box directly (e.g. rBox_057), show that box's detail immediately
+    if (!itemData.length && boxData.length === 1) {
+      openBox(boxData[0].box_id);
+      container.innerHTML = '';
       label.textContent = '';
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="icon">🔍</div>
-          <p>No items found for "<strong>${escHtml(query)}</strong>"</p>
-        </div>`;
       return;
     }
 
-    label.textContent = `${data.length} result${data.length !== 1 ? 's' : ''} for "${query}"`;
-    container.innerHTML = data.map(item => `
+    // Build results — box matches shown first as a special card, then item results
+    let html = '';
+
+    if (boxData.length) {
+      html += boxData.map(box => `
+        <div class="result-card" onclick="openBox('${escHtml(box.box_id)}')">
+          <div class="result-top">
+            <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
+            <div class="result-box-id">${escHtml(box.box_id)}</div>
+          </div>
+          <div class="result-meta">
+            ${box.location ? `<div class="result-meta-item">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              ${escHtml(box.location)}
+            </div>` : ''}
+          </div>
+          <div class="result-description">Click to view all contents</div>
+        </div>
+      `).join('');
+    }
+
+    html += itemData.map(item => `
       <div class="result-card" onclick="openBox('${escHtml(item.box_id)}')">
         <div class="result-top">
           <div class="result-item">${escHtml(item.item_name)}</div>
@@ -855,6 +877,22 @@ async function searchItems(query) {
         ${item.boxes?.description ? `<div class="result-description">${escHtml(item.boxes.description)}</div>` : ''}
       </div>
     `).join('');
+
+    const total = itemData.length + boxData.length;
+
+    if (!total) {
+      label.textContent = '';
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">🔍</div>
+          <p>No results found for "<strong>${escHtml(query)}</strong>"</p>
+        </div>`;
+      return;
+    }
+
+    label.textContent = `${total} result${total !== 1 ? 's' : ''} for "${query}"`;
+    container.innerHTML = html;
+
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><p>Error searching. Please try again.</p></div>`;
   }
