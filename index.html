@@ -21,7 +21,7 @@
     --mono: 'DM Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     --radius: 10px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(160, 123, 123, 0.06);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,11 +35,11 @@
   .auth-card p { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
   .form-group { margin-bottom: 16px; }
   .form-group label { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .form-group input, .form-group textarea {
+  .form-group input {
     width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
     font-family: var(--sans); font-size: 15px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
   }
-  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); background: white; }
+  .form-group input:focus { border-color: var(--accent); background: white; }
   .btn-primary { width: 100%; padding: 13px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-family: var(--sans); font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s; margin-top: 8px; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
@@ -94,46 +94,63 @@
   .result-meta-item { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
   .result-description { font-size: 13px; color: var(--muted); margin-top: 4px; font-style: italic; }
 
-  /* ── MODAL ── */
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: flex-end; justify-content: center; }
+  /* ── MODAL — slides up from bottom, NO click-outside-to-close ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45); z-index: 200;
+    align-items: flex-end; justify-content: center;
+    /* pointer-events on overlay itself are disabled so clicking outside does nothing */
+    pointer-events: none;
+  }
   .modal-overlay.open { display: flex; animation: fadeOverlay 0.2s ease; }
   @keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
-  .modal { background: var(--surface); border-radius: 16px 16px 0 0; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.25s ease; }
+
+  .modal {
+    background: var(--surface); border-radius: 16px 16px 0 0;
+    width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
+    animation: slideUp 0.25s ease;
+    pointer-events: all; /* re-enable on the modal itself */
+    box-shadow: 0 -4px 40px rgba(0,0,0,0.15);
+  }
   @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
 
-  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-  .modal-header-left { flex: 1; }
-  .modal-box-id { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
-  .modal-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
-  .modal-header-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-  .btn-sm { padding: 6px 12px; border-radius: 6px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: all 0.15s; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
-  .btn-sm:hover { color: var(--text); border-color: var(--text); }
+  .modal-header { padding: 16px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; }
+  .modal-header-left { flex: 1; min-width: 0; }
+  .modal-box-id { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; }
+  .modal-title { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .modal-header-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+  .btn-sm { padding: 7px 13px; border-radius: 7px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .btn-sm:hover { color: var(--text); border-color: #aaa; }
   .btn-sm.danger { color: var(--danger); border-color: rgba(192,57,43,0.3); background: var(--danger-light); }
   .btn-sm.danger:hover { background: #f5c6c2; border-color: var(--danger); }
   .btn-sm.primary { color: white; border-color: var(--accent); background: var(--accent); }
   .btn-sm.primary:hover { background: var(--accent-hover); }
+  /* Close button is deliberately prominent */
+  .btn-close { padding: 7px 14px; border-radius: 7px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid var(--border); background: var(--surface); color: var(--text); transition: all 0.15s; }
+  .btn-close:hover { background: var(--bg); border-color: #999; }
 
-  .modal-meta { padding: 14px 24px; display: flex; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: var(--bg); align-items: flex-start; }
+  .edit-mode-bar { background: var(--accent-light); border-bottom: 1px solid rgba(45,90,39,0.2); padding: 8px 20px; display: none; align-items: center; justify-content: space-between; }
+  .edit-mode-bar.visible { display: flex; }
+  .edit-mode-bar span { font-size: 12px; color: var(--accent); font-weight: 500; }
+
+  .modal-meta { padding: 12px 20px; display: flex; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: var(--bg); align-items: flex-start; }
   .modal-meta-item { display: flex; flex-direction: column; gap: 4px; }
   .modal-meta-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .modal-meta-value { font-family: var(--mono); font-size: 13px; color: var(--text); }
-  .modal-meta-input { font-family: var(--mono); font-size: 13px; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: white; outline: none; width: 160px; }
+  .modal-meta-input { font-family: var(--mono); font-size: 13px; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: white; outline: none; width: 140px; }
   .modal-meta-input:focus { border-color: var(--accent); }
-  .modal-meta-input.wide { width: 220px; font-family: var(--sans); }
-
-  .edit-mode-bar { background: var(--accent-light); border-bottom: 1px solid rgba(45,90,39,0.2); padding: 8px 24px; display: none; align-items: center; justify-content: space-between; }
-  .edit-mode-bar.visible { display: flex; }
-  .edit-mode-bar span { font-size: 12px; color: var(--accent); font-weight: 500; }
+  .modal-meta-input.wide { width: 210px; font-family: var(--sans); }
 
   .modal-image-wrap { position: relative; }
   .modal-image { width: 100%; max-height: 240px; object-fit: cover; display: block; }
   .modal-image-overlay-btn { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: var(--sans); font-weight: 500; }
-  .modal-image-placeholder { border-bottom: 1px solid var(--border); padding: 16px 24px; }
+  .modal-image-placeholder { border-bottom: 1px solid var(--border); padding: 14px 20px; }
   .modal-image-placeholder-btn { background: var(--accent-light); color: var(--accent); border: 1.5px dashed rgba(45,90,39,0.3); border-radius: 8px; padding: 14px 24px; font-size: 13px; cursor: pointer; font-family: var(--sans); width: 100%; transition: all 0.15s; }
   .modal-image-placeholder-btn:hover { background: #dce8db; }
 
-  .modal-section { padding: 20px 24px; }
+  .modal-section { padding: 18px 20px; }
   .modal-section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
 
   /* ── ITEMS ── */
@@ -161,24 +178,27 @@
   .add-item-btn:hover { background: var(--accent-hover); }
 
   /* ── CONFIRM ── */
-  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; align-items: center; justify-content: center; padding: 24px; }
-  .confirm-overlay.open { display: flex; }
+  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 400; align-items: center; justify-content: center; padding: 24px; pointer-events: none; }
+  .confirm-overlay.open { display: flex; pointer-events: all; }
   .confirm-card { background: var(--surface); border-radius: 12px; padding: 28px; max-width: 360px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
   .confirm-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
   .confirm-card p { font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
   .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
   .btn-cancel { padding: 9px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: var(--sans); font-size: 14px; cursor: pointer; }
+  .btn-cancel:hover { border-color: #aaa; }
   .btn-confirm-delete { padding: 9px 16px; background: var(--danger); color: white; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
 
   /* ── ADD BOX ── */
-  .add-box-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 24px; }
-  .add-box-overlay.open { display: flex; }
-  .add-box-card { background: var(--surface); border-radius: 16px; padding: 32px; max-width: 440px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+  .add-box-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 24px; pointer-events: none; }
+  .add-box-overlay.open { display: flex; pointer-events: all; }
+  .add-box-card { background: var(--surface); border-radius: 16px; padding: 32px; max-width: 420px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
   .add-box-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
   .add-box-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
   .add-box-actions { display: flex; gap: 8px; margin-top: 8px; }
   .add-box-actions .btn-cancel { flex: 1; text-align: center; }
   .add-box-actions .btn-primary { flex: 2; margin-top: 0; }
+  .barcode-preview { font-family: var(--mono); font-size: 13px; color: var(--accent); background: var(--accent-light); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .barcode-preview span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
 
   /* ── TOAST ── */
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a18; color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
@@ -192,13 +212,13 @@
   .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  @media (max-width: 480px) {
-    .main { padding: 24px 16px 80px; }
+  @media (max-width: 520px) {
+    .main { padding: 24px 14px 80px; }
     .hero h2 { font-size: 22px; }
-    .auth-card { padding: 32px 24px; }
-    .modal { max-height: 92vh; }
-    .modal-header { flex-direction: column; gap: 12px; }
-    .modal-header-actions { width: 100%; }
+    .auth-card { padding: 32px 20px; }
+    .modal { max-height: 93vh; }
+    .modal-header { flex-direction: column; gap: 10px; }
+    .modal-header-actions { width: 100%; justify-content: flex-start; }
   }
 </style>
 </head>
@@ -262,8 +282,8 @@
   </div>
 </div>
 
-<!-- BOX DETAIL MODAL -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
+<!-- BOX DETAIL MODAL — no click-outside-to-close -->
+<div class="modal-overlay" id="modal-overlay">
   <div class="modal" id="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
@@ -274,11 +294,11 @@
       <div class="modal-header-actions">
         <button class="btn-sm primary" id="edit-toggle-btn" onclick="toggleEditMode()">✏️ Edit</button>
         <button class="btn-sm danger" onclick="confirmDeleteBox()">🗑 Delete</button>
-        <button class="btn-sm" onclick="closeModalDirect()">✕ Close</button>
+        <button class="btn-close" onclick="closeModalDirect()">✕ Close</button>
       </div>
     </div>
     <div class="edit-mode-bar" id="edit-mode-bar">
-      <span>✏️ Edit mode — changes save instantly</span>
+      <span>✏️ Edit mode — changes save when you click away from each field</span>
       <button class="btn-sm primary" onclick="toggleEditMode()">Done editing</button>
     </div>
     <div class="modal-meta" id="modal-meta"></div>
@@ -297,11 +317,14 @@
   </div>
 </div>
 
-<!-- ADD BOX MODAL -->
-<div class="add-box-overlay" id="add-box-overlay" onclick="closeAddBoxOnBg(event)">
+<!-- ADD BOX MODAL — no click-outside-to-close -->
+<div class="add-box-overlay" id="add-box-overlay">
   <div class="add-box-card">
     <h3>New Box</h3>
-    <p class="add-box-subtitle">ID will be assigned automatically</p>
+    <p class="add-box-subtitle">Barcode and ID are assigned automatically</p>
+    <div id="new-box-barcode-preview" class="barcode-preview" style="display:none">
+      <span>Barcode:</span> <strong id="new-box-barcode-value">—</strong>
+    </div>
     <div class="form-group">
       <label>Location</label>
       <input type="text" id="new-box-location" placeholder="e.g. SR02A" spellcheck="false">
@@ -310,13 +333,9 @@
       <label>Description</label>
       <input type="text" id="new-box-description" placeholder="e.g. Power tools, drill bits" spellcheck="true">
     </div>
-    <div class="form-group">
-      <label>Barcode (optional)</label>
-      <input type="text" id="new-box-barcode" placeholder="e.g. 990200" spellcheck="false">
-    </div>
     <div class="add-box-actions">
       <button class="btn-cancel" onclick="closeAddBox()">Cancel</button>
-      <button class="btn-primary" onclick="createBox()">Create Box</button>
+      <button class="btn-primary" id="create-box-btn" onclick="createBox()">Create Box</button>
     </div>
   </div>
 </div>
@@ -351,6 +370,7 @@ let scannerInterval = null;
 let currentBox = null;
 let editMode = false;
 let pendingItemImageId = null;
+let nextBarcode = null;
 
 // ── INIT ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -543,8 +563,7 @@ function renderImageSection(box) {
   if (box.box_image_url) {
     sec.innerHTML = `
       <div class="modal-image-wrap">
-        <img class="modal-image" src="${escHtml(box.box_image_url)}" alt="Box contents"
-          onerror="this.style.display='none'">
+        <img class="modal-image" src="${escHtml(box.box_image_url)}" alt="Box contents" onerror="this.style.display='none'">
         ${editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
       </div>`;
   } else if (editMode) {
@@ -577,7 +596,7 @@ function renderItemRow(item) {
         ${item.item_image_url
           ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">`
           : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">+</button>`}
-        <button class="item-btn delete" onclick="confirmDeleteItem(${item.id}, '${escHtml(item.item_name).replace(/'/g,"&#39;")}')" title="Delete item">🗑</button>
+        <button class="item-btn delete" onclick="confirmDeleteItem(${item.id}, '${escHtml(item.item_name).replace(/'/g,'&#39;')}')" title="Delete item">🗑</button>
       </div>
     </li>`;
   } else {
@@ -692,33 +711,66 @@ function confirmDeleteBox() {
 }
 
 // ── ADD BOX ───────────────────────────────────────────────
-function openAddBox() { document.getElementById('add-box-overlay').classList.add('open'); }
+async function openAddBox() {
+  nextBarcode = null;
+  document.getElementById('new-box-barcode-preview').style.display = 'none';
+  document.getElementById('new-box-barcode-value').textContent = '—';
+  document.getElementById('new-box-location').value = '';
+  document.getElementById('new-box-description').value = '';
+  document.getElementById('add-box-overlay').classList.add('open');
+
+  // Pre-generate barcode and show it
+  try {
+    const res = await supaFetch('/rest/v1/boxes?select=barcode&barcode=like.99*&order=barcode.desc&limit=200');
+    const data = await res.json();
+    const existing = new Set(data.map(b => b.barcode).filter(Boolean));
+    let candidate = 990000;
+    while (existing.has(String(candidate))) candidate++;
+    // Make sure it stays 6 digits starting with 99
+    if (candidate > 999999) candidate = 990000;
+    nextBarcode = String(candidate);
+    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
+    document.getElementById('new-box-barcode-preview').style.display = 'flex';
+  } catch(e) {
+    nextBarcode = String(990000 + Math.floor(Math.random() * 9000));
+    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
+    document.getElementById('new-box-barcode-preview').style.display = 'flex';
+  }
+}
+
 function closeAddBox() { document.getElementById('add-box-overlay').classList.remove('open'); }
-function closeAddBoxOnBg(e) { if (e.target === document.getElementById('add-box-overlay')) closeAddBox(); }
 
 async function createBox() {
   const location = document.getElementById('new-box-location').value.trim();
   const description = document.getElementById('new-box-description').value.trim();
-  const barcode = document.getElementById('new-box-barcode').value.trim();
+  const btn = document.getElementById('create-box-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
   try {
+    // Get next box ID
     const res = await supaFetch('/rest/v1/boxes?select=box_id&order=box_id.desc&limit=200');
     const data = await res.json();
     let maxNum = 0;
     data.forEach(b => { const m = b.box_id.match(/(\d+)/); if (m) maxNum = Math.max(maxNum, parseInt(m[1])); });
     const newId = `rBox_${String(maxNum + 1).padStart(3, '0')}`;
+
     const createRes = await supaFetch('/rest/v1/boxes', {
       method: 'POST',
-      body: JSON.stringify({ box_id: newId, location: location || null, description: description || null, barcode: barcode || null, box_image_url: null })
+      body: JSON.stringify({
+        box_id: newId,
+        location: location || null,
+        description: description || null,
+        barcode: nextBarcode,
+        box_image_url: null
+      })
     });
     if (!createRes.ok) throw new Error();
     closeAddBox();
-    document.getElementById('new-box-location').value = '';
-    document.getElementById('new-box-description').value = '';
-    document.getElementById('new-box-barcode').value = '';
     showToast(`${newId} created ✓`);
     loadStats();
     openBox(newId);
-  } catch(e) { showToast('Failed to create box'); }
+  } catch(e) { showToast('Failed to create box — try again'); }
+  finally { btn.disabled = false; btn.textContent = 'Create Box'; }
 }
 
 // ── IMAGE UPLOAD ──────────────────────────────────────────
@@ -740,7 +792,7 @@ async function uploadBoxImage(input) {
     currentBox.box_image_url = url;
     renderImageSection(currentBox);
     showToast('Photo saved ✓');
-  } catch(e) { showToast('Upload failed — see note below'); }
+  } catch(e) { showToast('Upload failed — storage bucket not set up yet'); }
   input.value = '';
 }
 
@@ -806,7 +858,6 @@ async function lookupBarcode(barcode) {
 }
 
 // ── MODAL ─────────────────────────────────────────────────
-function closeModalOnBg(e) { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
 function closeModalDirect() {
   document.getElementById('modal-overlay').classList.remove('open');
   editMode = false; currentBox = null;
