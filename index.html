@@ -246,7 +246,7 @@
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.0</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.1</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -371,6 +371,7 @@ let currentBox = null;
 let editMode = false;
 let pendingItemImageId = null;
 let nextBarcode = null;
+let lastSearchQuery = '';
 
 // ── INIT ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -462,13 +463,13 @@ async function searchItems(query) {
     const boxData = await boxesRes.json();
 
     if (!itemData.length && boxData.length === 1) {
-      openBox(boxData[0].box_id); container.innerHTML = ''; label.textContent = ''; return;
+      lastSearchQuery = query; openBox(boxData[0].box_id); container.innerHTML = ''; label.textContent = ''; return;
     }
 
     let html = '';
     if (boxData.length) {
       html += boxData.map(box => `
-        <div class="result-card" onclick="openBox('${escHtml(box.box_id)}')">
+        <div class="result-card" onclick="lastSearchQuery=query;openBox('${escHtml(box.box_id)}')">
           <div class="result-top">
             <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
             <div class="result-box-id">${escHtml(box.box_id)}</div>
@@ -478,7 +479,7 @@ async function searchItems(query) {
         </div>`).join('');
     }
     html += itemData.map(item => `
-      <div class="result-card" onclick="openBox('${escHtml(item.box_id)}')">
+      <div class="result-card" onclick="lastSearchQuery=query;openBox('${escHtml(item.box_id)}')">
         <div class="result-top">
           <div class="result-item">${escHtml(item.item_name)}</div>
           <div class="result-box-id">${escHtml(item.box_id)}</div>
@@ -528,7 +529,8 @@ async function openBox(boxId) {
 }
 
 function renderBoxDetail(box, items) {
-  document.getElementById('modal-title').textContent = box.description || box.box_id;
+  document.getElementById('modal-title').innerHTML = highlight(box.description || box.box_id);
+  document.getElementById('modal-box-id').innerHTML = highlight(box.box_id);
   renderMeta(box);
   renderImageSection(box);
   renderItems(items);
@@ -551,9 +553,9 @@ function renderMeta(box) {
       </div>`;
   } else {
     document.getElementById('modal-meta').innerHTML = `
-      ${box.location ? `<div class="modal-meta-item"><div class="modal-meta-label">Location</div><div class="modal-meta-value">${escHtml(box.location)}</div></div>` : ''}
-      ${box.description ? `<div class="modal-meta-item"><div class="modal-meta-label">Description</div><div class="modal-meta-value" style="font-family:var(--sans)">${escHtml(box.description)}</div></div>` : ''}
-      ${box.barcode ? `<div class="modal-meta-item"><div class="modal-meta-label">Barcode</div><div class="modal-meta-value">${escHtml(box.barcode)}</div></div>` : ''}
+      ${box.location ? `<div class="modal-meta-item"><div class="modal-meta-label">Location</div><div class="modal-meta-value">${highlight(box.location)}</div></div>` : ''}
+      ${box.description ? `<div class="modal-meta-item"><div class="modal-meta-label">Description</div><div class="modal-meta-value" style="font-family:var(--sans)">${highlight(box.description)}</div></div>` : ''}
+      ${box.barcode ? `<div class="modal-meta-item"><div class="modal-meta-label">Barcode</div><div class="modal-meta-value">${highlight(box.barcode)}</div></div>` : ''}
       <div class="modal-meta-item"><div class="modal-meta-label">Items</div><div class="modal-meta-value" id="item-count-display">–</div></div>`;
   }
 }
@@ -594,7 +596,7 @@ function renderItemRow(item) {
       <div class="item-actions">
         <button class="item-btn save" onclick="saveItemName(${item.id}, document.getElementById('item-input-${item.id}').value)" title="Save">✓</button>
         ${item.item_image_url
-          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">`
+          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()"><button class="item-btn delete" onclick="deleteItemPhoto(${item.id})" title="Delete photo">🖼✕</button>`
           : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">+</button>`}
         <button class="item-btn delete" onclick="confirmDeleteItem(${item.id}, '${escHtml(item.item_name).replace(/'/g,'&#39;')}')" title="Delete item">🗑</button>
       </div>
@@ -602,7 +604,7 @@ function renderItemRow(item) {
   } else {
     return `<li class="item-row">
       <span class="item-dot"></span>
-      <span class="item-name-view">${escHtml(item.item_name)}</span>
+      <span class="item-name-view">${highlight(item.item_name)}</span>
       ${item.item_image_url ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="View photo" onclick="window.open('${escHtml(item.item_image_url)}','_blank')">` : ''}
     </li>`;
   }
@@ -879,6 +881,31 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── HELPERS ─────────────────────────────────────────────
+function highlight(str) {
+  if (!str) return '';
+  const safe = escHtml(String(str));
+  if (!lastSearchQuery.trim()) return safe;
+  const terms = lastSearchQuery.trim().split(/\s+/).filter(Boolean);
+  let result = safe;
+  terms.forEach(term => {
+    const escaped = escHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(escaped, 'gi'), m => `<mark style="background:#fff176;border-radius:2px;padding:0 1px">${m}</mark>`);
+  });
+  return result;
+}
+
+async function deleteItemPhoto(itemId) {
+  try {
+    await supaFetch(`/rest/v1/items?id=eq.${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ item_image_url: null })
+    });
+    showToast('Photo removed ✓');
+    refreshItems();
+  } catch(e) { showToast('Failed to remove photo'); }
 }
 
 // ── HELPERS ───────────────────────────────────────────────
