@@ -21,7 +21,7 @@
     --mono: 'DM Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     --radius: 10px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(160, 123, 123, 0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -246,7 +246,7 @@
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory</div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.0</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
