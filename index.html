@@ -16,6 +16,8 @@
     --accent: #2d5a27;
     --accent-light: #e8f0e7;
     --accent-hover: #234820;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
     --mono: 'DM Mono', monospace;
     --sans: 'DM Sans', sans-serif;
     --radius: 10px;
@@ -23,602 +25,186 @@
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  body {
-    font-family: var(--sans);
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
+  /* ── AUTH ── */
+  #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 48px 40px; width: 100%; max-width: 400px; box-shadow: var(--shadow); }
+  .auth-logo { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 32px; }
+  .auth-card h1 { font-size: 26px; font-weight: 600; margin-bottom: 8px; letter-spacing: -0.02em; }
+  .auth-card p { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .form-group input, .form-group textarea {
+    width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
+    font-family: var(--sans); font-size: 15px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
   }
-
-  /* AUTH SCREEN */
-  #auth-screen {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 24px;
-  }
-
-  .auth-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 48px 40px;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: var(--shadow);
-  }
-
-  .auth-logo {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--accent);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 32px;
-  }
-
-  .auth-card h1 {
-    font-size: 26px;
-    font-weight: 600;
-    margin-bottom: 8px;
-    letter-spacing: -0.02em;
-  }
-
-  .auth-card p {
-    color: var(--muted);
-    font-size: 14px;
-    margin-bottom: 32px;
-  }
-
-  .form-group {
-    margin-bottom: 16px;
-  }
-
-  .form-group label {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-
-  .form-group input {
-    width: 100%;
-    padding: 12px 14px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 15px;
-    background: var(--bg);
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.15s;
-  }
-
-  .form-group input:focus {
-    border-color: var(--accent);
-    background: white;
-  }
-
-  .btn-primary {
-    width: 100%;
-    padding: 13px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: var(--radius);
-    font-family: var(--sans);
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s;
-    margin-top: 8px;
-  }
-
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); background: white; }
+  .btn-primary { width: 100%; padding: 13px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-family: var(--sans); font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s; margin-top: 8px; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+  .auth-error { color: var(--danger); font-size: 13px; margin-top: 12px; text-align: center; }
 
-  .auth-error {
-    color: #c0392b;
-    font-size: 13px;
-    margin-top: 12px;
-    text-align: center;
-  }
-
-  /* MAIN APP */
+  /* ── TOPBAR ── */
   #app-screen { display: none; min-height: 100vh; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .topbar-logo { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
+  .btn-icon { background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font-family: var(--sans); font-size: 13px; color: var(--muted); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .btn-icon:hover { color: var(--text); border-color: var(--text); }
+  .btn-icon.accent { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn-icon.accent:hover { background: var(--accent-hover); }
 
-  .topbar {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
+  /* ── MAIN ── */
+  .main { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+  .hero { text-align: center; margin-bottom: 40px; }
+  .hero h2 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
+  .hero p { color: var(--muted); font-size: 14px; }
 
-  .topbar-logo {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--accent);
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    font-weight: 500;
-  }
-
-  .topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .btn-logout {
-    font-family: var(--sans);
-    font-size: 13px;
-    color: var(--muted);
-    background: none;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-logout:hover { color: var(--text); border-color: var(--text); }
-
-  .main {
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 40px 24px 80px;
-  }
-
-  /* HERO SEARCH */
-  .hero {
-    text-align: center;
-    margin-bottom: 40px;
-  }
-
-  .hero h2 {
-    font-size: 28px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    margin-bottom: 6px;
-  }
-
-  .hero p {
-    color: var(--muted);
-    font-size: 14px;
-  }
-
-  .search-wrap {
-    position: relative;
-    margin-top: 28px;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--muted);
-    pointer-events: none;
-  }
-
-  #search-input {
-    width: 100%;
-    padding: 16px 56px 16px 48px;
-    border: 1.5px solid var(--border);
-    border-radius: 12px;
-    font-family: var(--sans);
-    font-size: 16px;
-    background: var(--surface);
-    color: var(--text);
-    outline: none;
-    box-shadow: var(--shadow);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-
-  #search-input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(45,90,39,0.1), var(--shadow);
-  }
-
-  .search-clear {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 18px;
-    display: none;
-    line-height: 1;
-    padding: 4px;
-  }
-
-  /* SCAN BUTTON */
-  .scan-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin: 16px auto 0;
-    padding: 10px 20px;
-    background: var(--accent-light);
-    color: var(--accent);
-    border: 1.5px solid rgba(45,90,39,0.2);
-    border-radius: 8px;
-    font-family: var(--sans);
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
+  /* ── SEARCH ── */
+  .search-wrap { position: relative; margin-top: 28px; }
+  .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  #search-input { width: 100%; padding: 16px 56px 16px 48px; border: 1.5px solid var(--border); border-radius: 12px; font-family: var(--sans); font-size: 16px; background: var(--surface); color: var(--text); outline: none; box-shadow: var(--shadow); transition: border-color 0.15s, box-shadow 0.15s; }
+  #search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,90,39,0.1), var(--shadow); }
+  .search-clear { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; display: none; line-height: 1; padding: 4px; }
+  .scan-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px auto 0; padding: 10px 20px; background: var(--accent-light); color: var(--accent); border: 1.5px solid rgba(45,90,39,0.2); border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
   .scan-btn:hover { background: #dce8db; }
 
-  /* SCANNER */
-  #scanner-wrap {
-    display: none;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    margin-top: 16px;
-    box-shadow: var(--shadow);
-  }
+  /* ── SCANNER ── */
+  #scanner-wrap { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 16px; box-shadow: var(--shadow); }
+  .scanner-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .scanner-header span { font-size: 13px; font-weight: 500; color: var(--muted); }
+  .scanner-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted); line-height: 1; }
+  #scanner-video { width: 100%; max-height: 280px; object-fit: cover; display: block; }
+  .scanner-hint { padding: 10px 16px; font-size: 12px; color: var(--muted); text-align: center; }
 
-  .scanner-header {
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-  }
+  /* ── STATS ── */
+  .stats-bar { display: flex; gap: 12px; margin-bottom: 24px; }
+  .stat-chip { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
+  .stat-chip strong { color: var(--text); font-weight: 500; }
 
-  .scanner-header span {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-  }
+  /* ── RESULTS ── */
+  #results-label { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+  .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; animation: fadeIn 0.2s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .result-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(45,90,39,0.1); }
+  .result-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+  .result-item { font-size: 15px; font-weight: 500; flex: 1; }
+  .result-box-id { font-family: var(--mono); font-size: 12px; background: var(--accent-light); color: var(--accent); padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+  .result-meta { display: flex; gap: 16px; flex-wrap: wrap; }
+  .result-meta-item { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
+  .result-description { font-size: 13px; color: var(--muted); margin-top: 4px; font-style: italic; }
 
-  .scanner-close {
-    background: none;
-    border: none;
-    font-size: 20px;
-    cursor: pointer;
-    color: var(--muted);
-    line-height: 1;
-  }
+  /* ── MODAL ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; animation: fadeOverlay 0.2s ease; }
+  @keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
+  .modal { background: var(--surface); border-radius: 16px 16px 0 0; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.25s ease; }
+  @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
 
-  #scanner-video {
-    width: 100%;
-    max-height: 280px;
-    object-fit: cover;
-    display: block;
-  }
+  .modal-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .modal-header-left { flex: 1; }
+  .modal-box-id { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+  .modal-title { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+  .modal-header-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .btn-sm { padding: 6px 12px; border-radius: 6px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: all 0.15s; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .btn-sm:hover { color: var(--text); border-color: var(--text); }
+  .btn-sm.danger { color: var(--danger); border-color: rgba(192,57,43,0.3); background: var(--danger-light); }
+  .btn-sm.danger:hover { background: #f5c6c2; border-color: var(--danger); }
+  .btn-sm.primary { color: white; border-color: var(--accent); background: var(--accent); }
+  .btn-sm.primary:hover { background: var(--accent-hover); }
 
-  .scanner-hint {
-    padding: 10px 16px;
-    font-size: 12px;
-    color: var(--muted);
-    text-align: center;
-  }
+  .modal-meta { padding: 14px 24px; display: flex; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: var(--bg); align-items: flex-start; }
+  .modal-meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .modal-meta-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .modal-meta-value { font-family: var(--mono); font-size: 13px; color: var(--text); }
+  .modal-meta-input { font-family: var(--mono); font-size: 13px; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: white; outline: none; width: 160px; }
+  .modal-meta-input:focus { border-color: var(--accent); }
+  .modal-meta-input.wide { width: 220px; font-family: var(--sans); }
 
-  /* STATS BAR */
-  .stats-bar {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-  }
+  .edit-mode-bar { background: var(--accent-light); border-bottom: 1px solid rgba(45,90,39,0.2); padding: 8px 24px; display: none; align-items: center; justify-content: space-between; }
+  .edit-mode-bar.visible { display: flex; }
+  .edit-mode-bar span { font-size: 12px; color: var(--accent); font-weight: 500; }
 
-  .stat-chip {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--muted);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 10px;
-  }
+  .modal-image-wrap { position: relative; }
+  .modal-image { width: 100%; max-height: 240px; object-fit: cover; display: block; }
+  .modal-image-overlay-btn { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: var(--sans); font-weight: 500; }
+  .modal-image-placeholder { border-bottom: 1px solid var(--border); padding: 16px 24px; }
+  .modal-image-placeholder-btn { background: var(--accent-light); color: var(--accent); border: 1.5px dashed rgba(45,90,39,0.3); border-radius: 8px; padding: 14px 24px; font-size: 13px; cursor: pointer; font-family: var(--sans); width: 100%; transition: all 0.15s; }
+  .modal-image-placeholder-btn:hover { background: #dce8db; }
 
-  .stat-chip strong {
-    color: var(--text);
-    font-weight: 500;
-  }
+  .modal-section { padding: 20px 24px; }
+  .modal-section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
 
-  /* RESULTS */
-  #results-label {
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
+  /* ── ITEMS ── */
+  .item-list { list-style: none; }
+  .item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .item-row:last-child { border-bottom: none; }
+  .item-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .item-name-view { font-size: 14px; flex: 1; }
+  .item-name-input { font-size: 14px; flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-family: var(--sans); outline: none; background: white; }
+  .item-name-input:focus { border-color: var(--accent); }
+  .item-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+  .item-btn { background: none; border: none; cursor: pointer; padding: 4px 7px; border-radius: 4px; font-size: 13px; color: var(--muted); transition: all 0.15s; }
+  .item-btn:hover { background: var(--bg); color: var(--text); }
+  .item-btn.delete:hover { color: var(--danger); background: var(--danger-light); }
+  .item-btn.save { color: var(--accent); font-weight: 600; }
+  .item-btn.save:hover { background: var(--accent-light); }
+  .item-photo-thumb { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; cursor: pointer; border: 1px solid var(--border); }
+  .item-photo-add { width: 30px; height: 30px; border-radius: 4px; border: 1.5px dashed var(--border); background: none; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+  .item-photo-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 
-  .result-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px 20px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    animation: fadeIn 0.2s ease;
-  }
+  .add-item-row { display: flex; gap: 8px; margin-top: 16px; }
+  .add-item-input { flex: 1; padding: 10px 12px; border: 1.5px dashed var(--border); border-radius: 8px; font-family: var(--sans); font-size: 14px; outline: none; background: var(--bg); transition: border-color 0.15s; }
+  .add-item-input:focus { border-color: var(--accent); border-style: solid; background: white; }
+  .add-item-btn { padding: 10px 18px; background: var(--accent); color: white; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
+  .add-item-btn:hover { background: var(--accent-hover); }
 
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  /* ── CONFIRM ── */
+  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; align-items: center; justify-content: center; padding: 24px; }
+  .confirm-overlay.open { display: flex; }
+  .confirm-card { background: var(--surface); border-radius: 12px; padding: 28px; max-width: 360px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+  .confirm-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+  .confirm-card p { font-size: 14px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+  .confirm-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel { padding: 9px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: var(--sans); font-size: 14px; cursor: pointer; }
+  .btn-confirm-delete { padding: 9px 16px; background: var(--danger); color: white; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
 
-  .result-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 2px 12px rgba(45,90,39,0.1);
-  }
+  /* ── ADD BOX ── */
+  .add-box-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 24px; }
+  .add-box-overlay.open { display: flex; }
+  .add-box-card { background: var(--surface); border-radius: 16px; padding: 32px; max-width: 440px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+  .add-box-card h3 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .add-box-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .add-box-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .add-box-actions .btn-cancel { flex: 1; text-align: center; }
+  .add-box-actions .btn-primary { flex: 2; margin-top: 0; }
 
-  .result-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 6px;
-  }
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a18; color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
 
-  .result-item {
-    font-size: 15px;
-    font-weight: 500;
-    flex: 1;
-  }
-
-  .result-box-id {
-    font-family: var(--mono);
-    font-size: 12px;
-    background: var(--accent-light);
-    color: var(--accent);
-    padding: 3px 8px;
-    border-radius: 4px;
-    white-space: nowrap;
-  }
-
-  .result-meta {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .result-meta-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .result-description {
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 4px;
-    font-style: italic;
-  }
-
-  /* BOX DETAIL MODAL */
-  .modal-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 200;
-    align-items: flex-end;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .modal-overlay.open {
-    display: flex;
-    animation: fadeOverlay 0.2s ease;
-  }
-
-  @keyframes fadeOverlay {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  .modal {
-    background: var(--surface);
-    border-radius: 16px 16px 0 0;
-    width: 100%;
-    max-width: 720px;
-    max-height: 85vh;
-    overflow-y: auto;
-    padding: 0;
-    animation: slideUp 0.25s ease;
-  }
-
-  @keyframes slideUp {
-    from { transform: translateY(40px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-  }
-
-  .modal-handle {
-    width: 36px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin: 12px auto 0;
-  }
-
-  .modal-header {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .modal-box-id {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  .modal-title {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-
-  .modal-close {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 18px;
-    color: var(--muted);
-    flex-shrink: 0;
-    transition: all 0.15s;
-  }
-  .modal-close:hover { color: var(--text); }
-
-  .modal-meta {
-    padding: 14px 24px;
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg);
-  }
-
-  .modal-meta-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .modal-meta-label {
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .modal-meta-value {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: var(--text);
-  }
-
-  .modal-image {
-    width: 100%;
-    max-height: 220px;
-    object-fit: cover;
-    display: block;
-  }
-
-  .modal-section {
-    padding: 20px 24px;
-  }
-
-  .modal-section-title {
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-
-  .item-list {
-    list-style: none;
-  }
-
-  .item-list li {
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .item-list li:last-child { border-bottom: none; }
-
-  .item-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex-shrink: 0;
-  }
-
-  /* EMPTY STATE */
-  .empty-state {
-    text-align: center;
-    padding: 60px 24px;
-    color: var(--muted);
-  }
-
-  .empty-state .icon {
-    font-size: 40px;
-    margin-bottom: 12px;
-    opacity: 0.4;
-  }
-
-  .empty-state p {
-    font-size: 15px;
-  }
-
-  /* LOADING */
-  .loading {
-    text-align: center;
-    padding: 40px;
-    color: var(--muted);
-    font-size: 14px;
-  }
-
-  .spinner {
-    width: 24px;
-    height: 24px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    margin: 0 auto 12px;
-  }
-
+  /* ── EMPTY / LOADING ── */
+  .empty-state { text-align: center; padding: 60px 24px; color: var(--muted); }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+  .empty-state p { font-size: 15px; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* RESPONSIVE */
   @media (max-width: 480px) {
     .main { padding: 24px 16px 80px; }
     .hero h2 { font-size: 22px; }
     .auth-card { padding: 32px 24px; }
     .modal { max-height: 92vh; }
+    .modal-header { flex-direction: column; gap: 12px; }
+    .modal-header-actions { width: 100%; }
   }
 </style>
 </head>
 <body>
 
-<!-- AUTH SCREEN -->
+<!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-logo">⬡ Workshop</div>
@@ -637,115 +223,150 @@
   </div>
 </div>
 
-<!-- MAIN APP -->
+<!-- APP -->
 <div id="app-screen">
   <div class="topbar">
     <div class="topbar-logo">⬡ Workshop Inventory</div>
-    <div class="topbar-right">
-      <button class="btn-logout" onclick="handleLogout()">Sign out</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn-icon accent" onclick="openAddBox()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        New Box
+      </button>
+      <button class="btn-icon" onclick="handleLogout()">Sign out</button>
     </div>
   </div>
 
   <div class="main">
-    <!-- HERO -->
     <div class="hero">
       <h2>Find anything in your shop</h2>
       <p>Search across all boxes, or scan a barcode</p>
       <div class="search-wrap">
-        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input type="text" id="search-input" placeholder="Search items, e.g. '12v power supply'..." oninput="handleSearch(this.value)" onkeydown="if(event.key==='Escape'){clearSearch()}">
+        <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" placeholder="Search items, box IDs, locations…" oninput="handleSearch(this.value)" onkeydown="if(event.key==='Escape'){clearSearch()}">
         <button class="search-clear" id="search-clear" onclick="clearSearch()">×</button>
       </div>
       <button class="scan-btn" onclick="toggleScanner()">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
-          <rect x="7" y="7" width="10" height="10" rx="1"/>
-        </svg>
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
         Scan barcode
       </button>
-
-      <!-- SCANNER -->
       <div id="scanner-wrap">
-        <div class="scanner-header">
-          <span>Point camera at barcode</span>
-          <button class="scanner-close" onclick="stopScanner()">×</button>
-        </div>
+        <div class="scanner-header"><span>Point camera at barcode</span><button class="scanner-close" onclick="stopScanner()">×</button></div>
         <video id="scanner-video" playsinline autoplay muted></video>
         <canvas id="scanner-canvas" style="display:none"></canvas>
         <div class="scanner-hint">Hold steady — scanning automatically</div>
       </div>
     </div>
-
-    <!-- STATS -->
     <div class="stats-bar" id="stats-bar"></div>
-
-    <!-- RESULTS LABEL -->
     <div id="results-label"></div>
-
-    <!-- RESULTS -->
     <div id="results-container"></div>
   </div>
 </div>
 
 <!-- BOX DETAIL MODAL -->
-<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnBg(event)">
   <div class="modal" id="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
-      <div>
+      <div class="modal-header-left">
         <div class="modal-box-id" id="modal-box-id"></div>
         <div class="modal-title" id="modal-title"></div>
       </div>
-      <button class="modal-close" onclick="closeModalDirect()">×</button>
+      <div class="modal-header-actions">
+        <button class="btn-sm primary" id="edit-toggle-btn" onclick="toggleEditMode()">✏️ Edit</button>
+        <button class="btn-sm danger" onclick="confirmDeleteBox()">🗑 Delete</button>
+        <button class="btn-sm" onclick="closeModalDirect()">✕ Close</button>
+      </div>
+    </div>
+    <div class="edit-mode-bar" id="edit-mode-bar">
+      <span>✏️ Edit mode — changes save instantly</span>
+      <button class="btn-sm primary" onclick="toggleEditMode()">Done editing</button>
     </div>
     <div class="modal-meta" id="modal-meta"></div>
-    <img id="modal-image" class="modal-image" style="display:none" alt="Box contents">
+    <div id="modal-image-section"></div>
     <div class="modal-section">
       <div class="modal-section-title">Contents</div>
       <ul class="item-list" id="modal-items"></ul>
+      <div id="add-item-section" style="display:none">
+        <div class="add-item-row">
+          <input class="add-item-input" id="new-item-input" placeholder="Type new item and press Enter…" spellcheck="true"
+            onkeydown="if(event.key==='Enter'){addItem()}">
+          <button class="add-item-btn" onclick="addItem()">Add</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
+<!-- ADD BOX MODAL -->
+<div class="add-box-overlay" id="add-box-overlay" onclick="closeAddBoxOnBg(event)">
+  <div class="add-box-card">
+    <h3>New Box</h3>
+    <p class="add-box-subtitle">ID will be assigned automatically</p>
+    <div class="form-group">
+      <label>Location</label>
+      <input type="text" id="new-box-location" placeholder="e.g. SR02A" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" id="new-box-description" placeholder="e.g. Power tools, drill bits" spellcheck="true">
+    </div>
+    <div class="form-group">
+      <label>Barcode (optional)</label>
+      <input type="text" id="new-box-barcode" placeholder="e.g. 990200" spellcheck="false">
+    </div>
+    <div class="add-box-actions">
+      <button class="btn-cancel" onclick="closeAddBox()">Cancel</button>
+      <button class="btn-primary" onclick="createBox()">Create Box</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-card">
+    <h3 id="confirm-title">Delete?</h3>
+    <p id="confirm-message"></p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-confirm-delete" id="confirm-ok-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- HIDDEN FILE INPUTS -->
+<input type="file" id="box-image-input" accept="image/*" style="display:none" onchange="uploadBoxImage(this)">
+<input type="file" id="item-image-input" accept="image/*" style="display:none" onchange="uploadItemImage(this)">
+
 <script>
-// ─── CONFIG ───────────────────────────────────────────────
 const SUPABASE_URL = 'https://zjzirhiqqqducjxhvdhs.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_Hk1HfakqyFDueOB4-k96wQ_4tut5so-';
 
-// ─── STATE ────────────────────────────────────────────────
 let authToken = null;
 let searchTimeout = null;
 let scannerStream = null;
 let scannerInterval = null;
-let statsCache = null;
+let currentBox = null;
+let editMode = false;
+let pendingItemImageId = null;
 
-// ─── INIT ─────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   const saved = sessionStorage.getItem('wh_token');
-  if (saved) {
-    authToken = saved;
-    showApp();
-  }
-  document.getElementById('password-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') handleLogin();
-  });
+  if (saved) { authToken = saved; showApp(); }
+  document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
 });
 
-// ─── AUTH ─────────────────────────────────────────────────
+// ── AUTH ──────────────────────────────────────────────────
 async function handleLogin() {
   const email = document.getElementById('email-input').value.trim();
   const password = document.getElementById('password-input').value;
   const btn = document.getElementById('login-btn');
   const err = document.getElementById('auth-error');
-
   if (!email || !password) { err.textContent = 'Please enter email and password.'; return; }
-
-  btn.disabled = true;
-  btn.textContent = 'Signing in…';
-  err.textContent = '';
-
+  btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
   try {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: 'POST',
@@ -753,31 +374,25 @@ async function handleLogin() {
       body: JSON.stringify({ email, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || data.msg || 'Login failed');
+    if (!res.ok) throw new Error(data.error_description || 'Login failed');
     authToken = data.access_token;
     sessionStorage.setItem('wh_token', authToken);
     showApp();
-  } catch (e) {
-    err.textContent = e.message;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Sign in';
-  }
+  } catch (e) { err.textContent = e.message; }
+  finally { btn.disabled = false; btn.textContent = 'Sign in'; }
 }
 
 function handleLogout() {
-  authToken = null;
-  sessionStorage.removeItem('wh_token');
+  authToken = null; sessionStorage.removeItem('wh_token');
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
   stopScanner();
 }
 
-// ─── APP INIT ─────────────────────────────────────────────
 async function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
-  await loadStats();
+  loadStats();
 }
 
 async function loadStats() {
@@ -788,18 +403,15 @@ async function loadStats() {
     ]);
     const boxes = boxRes.headers.get('content-range')?.split('/')[1] || '?';
     const items = itemRes.headers.get('content-range')?.split('/')[1] || '?';
-    statsCache = { boxes, items };
     document.getElementById('stats-bar').innerHTML = `
       <div class="stat-chip"><strong>${boxes}</strong> boxes</div>
-      <div class="stat-chip"><strong>${items}</strong> items</div>
-    `;
+      <div class="stat-chip"><strong>${items}</strong> items</div>`;
   } catch(e) {}
 }
 
-// ─── SEARCH ───────────────────────────────────────────────
+// ── SEARCH ────────────────────────────────────────────────
 function handleSearch(val) {
-  const clear = document.getElementById('search-clear');
-  clear.style.display = val ? 'block' : 'none';
+  document.getElementById('search-clear').style.display = val ? 'block' : 'none';
   clearTimeout(searchTimeout);
   if (!val.trim()) { showEmpty(); return; }
   searchTimeout = setTimeout(() => searchItems(val.trim()), 300);
@@ -820,30 +432,20 @@ async function searchItems(query) {
   const container = document.getElementById('results-container');
   const label = document.getElementById('results-label');
   container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching…</div>';
-
   try {
-    const encoded = encodeURIComponent(`%${query}%`);
-
-    // Run both searches in parallel: items by name AND boxes by ID/description
+    const enc = encodeURIComponent(`%${query}%`);
     const [itemsRes, boxesRes] = await Promise.all([
-      supaFetch(`/rest/v1/items?select=item_name,box_id,boxes(box_id,location,description,box_image_url)&item_name=ilike.${encoded}&limit=80`),
-      supaFetch(`/rest/v1/boxes?or=(box_id.ilike.${encoded},description.ilike.${encoded},location.ilike.${encoded})&limit=20`)
+      supaFetch(`/rest/v1/items?select=item_name,box_id,boxes(box_id,location,description)&item_name=ilike.${enc}&limit=80`),
+      supaFetch(`/rest/v1/boxes?or=(box_id.ilike.${enc},description.ilike.${enc},location.ilike.${enc})&limit=20`)
     ]);
-
     const itemData = await itemsRes.json();
     const boxData = await boxesRes.json();
 
-    // If searching for a box directly (e.g. rBox_057), show that box's detail immediately
     if (!itemData.length && boxData.length === 1) {
-      openBox(boxData[0].box_id);
-      container.innerHTML = '';
-      label.textContent = '';
-      return;
+      openBox(boxData[0].box_id); container.innerHTML = ''; label.textContent = ''; return;
     }
 
-    // Build results — box matches shown first as a special card, then item results
     let html = '';
-
     if (boxData.length) {
       html += boxData.map(box => `
         <div class="result-card" onclick="openBox('${escHtml(box.box_id)}')">
@@ -851,181 +453,394 @@ async function searchItems(query) {
             <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
             <div class="result-box-id">${escHtml(box.box_id)}</div>
           </div>
-          <div class="result-meta">
-            ${box.location ? `<div class="result-meta-item">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              ${escHtml(box.location)}
-            </div>` : ''}
-          </div>
+          ${box.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(box.location)}</div></div>` : ''}
           <div class="result-description">Click to view all contents</div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
-
     html += itemData.map(item => `
       <div class="result-card" onclick="openBox('${escHtml(item.box_id)}')">
         <div class="result-top">
           <div class="result-item">${escHtml(item.item_name)}</div>
           <div class="result-box-id">${escHtml(item.box_id)}</div>
         </div>
-        <div class="result-meta">
-          ${item.boxes?.location ? `<div class="result-meta-item">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-            ${escHtml(item.boxes.location)}
-          </div>` : ''}
-        </div>
+        ${item.boxes?.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(item.boxes.location)}</div></div>` : ''}
         ${item.boxes?.description ? `<div class="result-description">${escHtml(item.boxes.description)}</div>` : ''}
-      </div>
-    `).join('');
+      </div>`).join('');
 
     const total = itemData.length + boxData.length;
-
     if (!total) {
       label.textContent = '';
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="icon">🔍</div>
-          <p>No results found for "<strong>${escHtml(query)}</strong>"</p>
-        </div>`;
+      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>No results for "<strong>${escHtml(query)}</strong>"</p></div>`;
       return;
     }
-
     label.textContent = `${total} result${total !== 1 ? 's' : ''} for "${query}"`;
     container.innerHTML = html;
-
   } catch(e) {
     container.innerHTML = `<div class="empty-state"><p>Error searching. Please try again.</p></div>`;
   }
 }
 
-// ─── BOX DETAIL ───────────────────────────────────────────
+// ── BOX DETAIL ────────────────────────────────────────────
 async function openBox(boxId) {
-  const overlay = document.getElementById('modal-overlay');
+  editMode = false;
+  currentBox = null;
+  document.getElementById('edit-mode-bar').classList.remove('visible');
+  document.getElementById('edit-toggle-btn').textContent = '✏️ Edit';
+  document.getElementById('add-item-section').style.display = 'none';
   document.getElementById('modal-box-id').textContent = boxId;
   document.getElementById('modal-title').textContent = 'Loading…';
   document.getElementById('modal-meta').innerHTML = '';
-  document.getElementById('modal-items').innerHTML = '<li style="color:var(--muted);font-size:14px">Loading…</li>';
-  document.getElementById('modal-image').style.display = 'none';
-  overlay.classList.add('open');
+  document.getElementById('modal-items').innerHTML = '<li style="color:var(--muted);padding:12px 0;font-size:14px">Loading…</li>';
+  document.getElementById('modal-image-section').innerHTML = '';
+  document.getElementById('modal-overlay').classList.add('open');
 
   try {
     const [boxRes, itemsRes] = await Promise.all([
       supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(boxId)}&limit=1`),
-      supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(boxId)}&select=item_name,item_image_url&order=item_name`)
+      supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(boxId)}&select=id,item_name,item_image_url&order=item_name`)
     ]);
     const boxes = await boxRes.json();
     const items = await itemsRes.json();
-    const box = boxes[0];
-    if (!box) return;
+    currentBox = boxes[0];
+    if (!currentBox) return;
+    renderBoxDetail(currentBox, items);
+  } catch(e) { document.getElementById('modal-title').textContent = 'Error loading box'; }
+}
 
-    document.getElementById('modal-title').textContent = box.description || boxId;
+function renderBoxDetail(box, items) {
+  document.getElementById('modal-title').textContent = box.description || box.box_id;
+  renderMeta(box);
+  renderImageSection(box);
+  renderItems(items);
+}
+
+function renderMeta(box) {
+  if (editMode) {
+    document.getElementById('modal-meta').innerHTML = `
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Location</div>
+        <input class="modal-meta-input" id="edit-location" value="${escHtml(box.location || '')}" placeholder="e.g. SR02A" spellcheck="false" onblur="saveBoxField('location', this.value)">
+      </div>
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Description</div>
+        <input class="modal-meta-input wide" id="edit-description" value="${escHtml(box.description || '')}" placeholder="Box description" spellcheck="true" onblur="saveBoxField('description', this.value)">
+      </div>
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Barcode</div>
+        <input class="modal-meta-input" id="edit-barcode" value="${escHtml(box.barcode || '')}" placeholder="e.g. 990123" spellcheck="false" onblur="saveBoxField('barcode', this.value)">
+      </div>`;
+  } else {
     document.getElementById('modal-meta').innerHTML = `
       ${box.location ? `<div class="modal-meta-item"><div class="modal-meta-label">Location</div><div class="modal-meta-value">${escHtml(box.location)}</div></div>` : ''}
+      ${box.description ? `<div class="modal-meta-item"><div class="modal-meta-label">Description</div><div class="modal-meta-value" style="font-family:var(--sans)">${escHtml(box.description)}</div></div>` : ''}
       ${box.barcode ? `<div class="modal-meta-item"><div class="modal-meta-label">Barcode</div><div class="modal-meta-value">${escHtml(box.barcode)}</div></div>` : ''}
-      <div class="modal-meta-item"><div class="modal-meta-label">Items</div><div class="modal-meta-value">${items.length}</div></div>
-    `;
-
-    if (box.box_image_url) {
-      const img = document.getElementById('modal-image');
-      img.src = box.box_image_url;
-      img.style.display = 'block';
-    }
-
-    document.getElementById('modal-items').innerHTML = items.length
-      ? items.map(i => `<li><span class="item-dot"></span>${escHtml(i.item_name)}</li>`).join('')
-      : '<li style="color:var(--muted);font-size:14px">No items recorded</li>';
-
-  } catch(e) {
-    document.getElementById('modal-title').textContent = 'Error loading box';
+      <div class="modal-meta-item"><div class="modal-meta-label">Items</div><div class="modal-meta-value" id="item-count-display">–</div></div>`;
   }
 }
 
-function closeModal(e) {
-  if (e.target === document.getElementById('modal-overlay')) closeModalDirect();
+function renderImageSection(box) {
+  const sec = document.getElementById('modal-image-section');
+  if (box.box_image_url) {
+    sec.innerHTML = `
+      <div class="modal-image-wrap">
+        <img class="modal-image" src="${escHtml(box.box_image_url)}" alt="Box contents"
+          onerror="this.style.display='none'">
+        ${editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
+      </div>`;
+  } else if (editMode) {
+    sec.innerHTML = `
+      <div class="modal-image-placeholder">
+        <button class="modal-image-placeholder-btn" onclick="document.getElementById('box-image-input').click()">📷 Add box photo</button>
+      </div>`;
+  } else {
+    sec.innerHTML = '';
+  }
 }
 
-function closeModalDirect() {
-  document.getElementById('modal-overlay').classList.remove('open');
+function renderItems(items) {
+  const count = document.getElementById('item-count-display');
+  if (count) count.textContent = items.length;
+  document.getElementById('modal-items').innerHTML = items.length
+    ? items.map(item => renderItemRow(item)).join('')
+    : `<li style="color:var(--muted);padding:12px 0;font-size:14px">No items recorded</li>`;
 }
 
-// ─── BARCODE SCANNER ──────────────────────────────────────
+function renderItemRow(item) {
+  if (editMode) {
+    return `<li class="item-row" id="item-row-${item.id}">
+      <span class="item-dot"></span>
+      <input class="item-name-input" value="${escHtml(item.item_name)}" spellcheck="true"
+        id="item-input-${item.id}"
+        onkeydown="if(event.key==='Enter'){saveItemName(${item.id},this.value)}">
+      <div class="item-actions">
+        <button class="item-btn save" onclick="saveItemName(${item.id}, document.getElementById('item-input-${item.id}').value)" title="Save">✓</button>
+        ${item.item_image_url
+          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">`
+          : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">+</button>`}
+        <button class="item-btn delete" onclick="confirmDeleteItem(${item.id}, '${escHtml(item.item_name).replace(/'/g,"&#39;")}')" title="Delete item">🗑</button>
+      </div>
+    </li>`;
+  } else {
+    return `<li class="item-row">
+      <span class="item-dot"></span>
+      <span class="item-name-view">${escHtml(item.item_name)}</span>
+      ${item.item_image_url ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="View photo" onclick="window.open('${escHtml(item.item_image_url)}','_blank')">` : ''}
+    </li>`;
+  }
+}
+
+// ── EDIT MODE ─────────────────────────────────────────────
+function toggleEditMode() {
+  editMode = !editMode;
+  document.getElementById('edit-toggle-btn').textContent = editMode ? '✓ Done' : '✏️ Edit';
+  document.getElementById('edit-mode-bar').classList.toggle('visible', editMode);
+  document.getElementById('add-item-section').style.display = editMode ? 'block' : 'none';
+  if (currentBox) { renderMeta(currentBox); renderImageSection(currentBox); }
+  refreshItems();
+}
+
+async function refreshItems() {
+  if (!currentBox) return;
+  try {
+    const res = await supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(currentBox.box_id)}&select=id,item_name,item_image_url&order=item_name`);
+    const items = await res.json();
+    renderItems(items);
+  } catch(e) {}
+}
+
+// ── SAVE BOX FIELD ────────────────────────────────────────
+async function saveBoxField(field, value) {
+  if (!currentBox) return;
+  try {
+    const res = await supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ [field]: value.trim() || null })
+    });
+    if (!res.ok) throw new Error();
+    currentBox[field] = value.trim() || null;
+    if (field === 'description') document.getElementById('modal-title').textContent = value.trim() || currentBox.box_id;
+    showToast('Saved ✓');
+  } catch(e) { showToast('Save failed — try again'); }
+}
+
+// ── SAVE ITEM ─────────────────────────────────────────────
+async function saveItemName(itemId, newName) {
+  if (!newName.trim()) { showToast('Item name cannot be empty'); return; }
+  try {
+    const res = await supaFetch(`/rest/v1/items?id=eq.${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ item_name: newName.trim() })
+    });
+    if (!res.ok) throw new Error();
+    showToast('Saved ✓');
+  } catch(e) { showToast('Save failed'); }
+}
+
+// ── ADD ITEM ──────────────────────────────────────────────
+async function addItem() {
+  const input = document.getElementById('new-item-input');
+  const name = input.value.trim();
+  if (!name || !currentBox) return;
+  try {
+    const res = await supaFetch('/rest/v1/items', {
+      method: 'POST',
+      body: JSON.stringify({ box_id: currentBox.box_id, item_name: name, item_image_url: null })
+    });
+    if (!res.ok) throw new Error();
+    input.value = '';
+    input.focus();
+    showToast('Item added ✓');
+    refreshItems();
+    loadStats();
+  } catch(e) { showToast('Failed to add item'); }
+}
+
+// ── DELETE ITEM ───────────────────────────────────────────
+function confirmDeleteItem(itemId, itemName) {
+  showConfirm(
+    'Delete item?',
+    `"${itemName}" will be permanently removed from this box.`,
+    async () => {
+      try {
+        await supaFetch(`/rest/v1/items?id=eq.${itemId}`, { method: 'DELETE' });
+        showToast('Item deleted');
+        refreshItems();
+        loadStats();
+      } catch(e) { showToast('Delete failed'); }
+    }
+  );
+}
+
+// ── DELETE BOX ────────────────────────────────────────────
+function confirmDeleteBox() {
+  if (!currentBox) return;
+  const itemCount = document.getElementById('modal-items').children.length;
+  showConfirm(
+    `Delete ${currentBox.box_id}?`,
+    `This will permanently delete this box and all ${itemCount} items inside it. This cannot be undone.`,
+    async () => {
+      try {
+        await supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, { method: 'DELETE' });
+        await supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, { method: 'DELETE' });
+        closeModalDirect();
+        showToast(`${currentBox.box_id} deleted`);
+        loadStats();
+        clearSearch();
+      } catch(e) { showToast('Delete failed'); }
+    }
+  );
+}
+
+// ── ADD BOX ───────────────────────────────────────────────
+function openAddBox() { document.getElementById('add-box-overlay').classList.add('open'); }
+function closeAddBox() { document.getElementById('add-box-overlay').classList.remove('open'); }
+function closeAddBoxOnBg(e) { if (e.target === document.getElementById('add-box-overlay')) closeAddBox(); }
+
+async function createBox() {
+  const location = document.getElementById('new-box-location').value.trim();
+  const description = document.getElementById('new-box-description').value.trim();
+  const barcode = document.getElementById('new-box-barcode').value.trim();
+  try {
+    const res = await supaFetch('/rest/v1/boxes?select=box_id&order=box_id.desc&limit=200');
+    const data = await res.json();
+    let maxNum = 0;
+    data.forEach(b => { const m = b.box_id.match(/(\d+)/); if (m) maxNum = Math.max(maxNum, parseInt(m[1])); });
+    const newId = `rBox_${String(maxNum + 1).padStart(3, '0')}`;
+    const createRes = await supaFetch('/rest/v1/boxes', {
+      method: 'POST',
+      body: JSON.stringify({ box_id: newId, location: location || null, description: description || null, barcode: barcode || null, box_image_url: null })
+    });
+    if (!createRes.ok) throw new Error();
+    closeAddBox();
+    document.getElementById('new-box-location').value = '';
+    document.getElementById('new-box-description').value = '';
+    document.getElementById('new-box-barcode').value = '';
+    showToast(`${newId} created ✓`);
+    loadStats();
+    openBox(newId);
+  } catch(e) { showToast('Failed to create box'); }
+}
+
+// ── IMAGE UPLOAD ──────────────────────────────────────────
+async function uploadBoxImage(input) {
+  if (!input.files[0] || !currentBox) return;
+  const file = input.files[0];
+  const ext = file.name.split('.').pop();
+  const path = `boxes/${currentBox.box_id}_${Date.now()}.${ext}`;
+  showToast('Uploading…');
+  try {
+    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/inventory-images/${path}`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': file.type, 'x-upsert': 'true' },
+      body: file
+    });
+    if (!uploadRes.ok) throw new Error();
+    const url = `${SUPABASE_URL}/storage/v1/object/public/inventory-images/${path}`;
+    await saveBoxField('box_image_url', url);
+    currentBox.box_image_url = url;
+    renderImageSection(currentBox);
+    showToast('Photo saved ✓');
+  } catch(e) { showToast('Upload failed — see note below'); }
+  input.value = '';
+}
+
+async function uploadItemImage(input) {
+  if (!input.files[0] || !pendingItemImageId) return;
+  const file = input.files[0];
+  const ext = file.name.split('.').pop();
+  const path = `items/${pendingItemImageId}_${Date.now()}.${ext}`;
+  showToast('Uploading…');
+  try {
+    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/inventory-images/${path}`, {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': file.type, 'x-upsert': 'true' },
+      body: file
+    });
+    if (!uploadRes.ok) throw new Error();
+    const url = `${SUPABASE_URL}/storage/v1/object/public/inventory-images/${path}`;
+    await supaFetch(`/rest/v1/items?id=eq.${pendingItemImageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ item_image_url: url })
+    });
+    showToast('Photo saved ✓');
+    refreshItems();
+  } catch(e) { showToast('Upload failed'); }
+  input.value = '';
+  pendingItemImageId = null;
+}
+
+// ── SCANNER ───────────────────────────────────────────────
 async function toggleScanner() {
   const wrap = document.getElementById('scanner-wrap');
   if (wrap.style.display === 'block') { stopScanner(); return; }
   wrap.style.display = 'block';
-
   try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
-    const video = document.getElementById('scanner-video');
-    video.srcObject = scannerStream;
-
+    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('scanner-video').srcObject = scannerStream;
     scannerInterval = setInterval(() => {
+      const video = document.getElementById('scanner-video');
       const canvas = document.getElementById('scanner-canvas');
       const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       ctx.drawImage(video, 0, 0);
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (code) {
-        stopScanner();
-        lookupBarcode(code.data);
-      }
+      if (code) { stopScanner(); lookupBarcode(code.data); }
     }, 300);
-  } catch(e) {
-    stopScanner();
-    alert('Camera access denied or not available. Please allow camera access and try again.');
-  }
+  } catch(e) { stopScanner(); alert('Camera access denied or not available.'); }
 }
 
 function stopScanner() {
   clearInterval(scannerInterval);
-  if (scannerStream) {
-    scannerStream.getTracks().forEach(t => t.stop());
-    scannerStream = null;
-  }
+  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
 }
 
 async function lookupBarcode(barcode) {
-  // Strip leading * if present
   const clean = barcode.replace(/^\*/, '');
   try {
     const res = await supaFetch(`/rest/v1/boxes?barcode=eq.${encodeURIComponent(clean)}&limit=1`);
     const data = await res.json();
-    if (data.length) {
-      openBox(data[0].box_id);
-    } else {
-      alert(`No box found for barcode: ${clean}`);
-    }
-  } catch(e) {
-    alert('Error looking up barcode.');
-  }
+    data.length ? openBox(data[0].box_id) : alert(`No box found for barcode: ${clean}`);
+  } catch(e) { alert('Error looking up barcode.'); }
 }
 
-// ─── HELPERS ──────────────────────────────────────────────
+// ── MODAL ─────────────────────────────────────────────────
+function closeModalOnBg(e) { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
+function closeModalDirect() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editMode = false; currentBox = null;
+}
+
+// ── CONFIRM ───────────────────────────────────────────────
+function showConfirm(title, message, onOk) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  document.getElementById('confirm-ok-btn').onclick = () => { closeConfirm(); onOk(); };
+  document.getElementById('confirm-overlay').classList.add('open');
+}
+function closeConfirm() { document.getElementById('confirm-overlay').classList.remove('open'); }
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── HELPERS ───────────────────────────────────────────────
 function supaFetch(path, extra = {}) {
   const { headers: extraHeaders = {}, ...rest } = extra;
   return fetch(`${SUPABASE_URL}${path}`, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': `Bearer ${authToken}`,
-      'Content-Type': 'application/json',
-      ...extraHeaders
-    },
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', ...extraHeaders },
     ...rest
   });
 }
-
 function escHtml(str) {
   if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 </script>
 </body>
