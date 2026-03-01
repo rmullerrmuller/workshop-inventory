@@ -246,7 +246,7 @@
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.1</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.2</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -469,7 +469,7 @@ async function searchItems(query) {
     let html = '';
     if (boxData.length) {
       html += boxData.map(box => `
-        <div class="result-card" onclick="lastSearchQuery=query;openBox('${escHtml(box.box_id)}')">
+        <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(box.box_id)}')">
           <div class="result-top">
             <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
             <div class="result-box-id">${escHtml(box.box_id)}</div>
@@ -479,7 +479,7 @@ async function searchItems(query) {
         </div>`).join('');
     }
     html += itemData.map(item => `
-      <div class="result-card" onclick="lastSearchQuery=query;openBox('${escHtml(item.box_id)}')">
+      <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(item.box_id)}')">
         <div class="result-top">
           <div class="result-item">${escHtml(item.item_name)}</div>
           <div class="result-box-id">${escHtml(item.box_id)}</div>
