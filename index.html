@@ -259,7 +259,10 @@ function renderImageSection() {
     sec.innerHTML = `
       <div class="modal-image-wrap">
         <img class="modal-image" src="${escHtml(currentBox.box_image_url)}" alt="Box contents" onerror="this.style.display='none'">
-        ${window.editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
+        ${window.editMode ? `
+          <button class="modal-image-overlay-btn" style="right:130px" onclick="document.getElementById('box-image-input').click()">📷 Replace</button>
+          <button class="modal-image-overlay-btn" style="background:rgba(192,57,43,0.85)" onclick="deleteBoxPhoto()">🗑 Remove</button>
+        ` : ''}
       </div>`;
   } else if (window.editMode) {
     sec.innerHTML = `
@@ -377,6 +380,16 @@ window.deleteItemPhoto = async (itemId) => {
     const item = currentItems.find(i => i.id === itemId);
     if (item) item.item_image_url = null;
     renderItems();
+    showToast('Photo removed ✓');
+  } catch(e) { showToast('Failed to remove photo'); }
+};
+
+// ── DELETE BOX PHOTO ─────────────────────────────────────
+window.deleteBoxPhoto = async () => {
+  try {
+    await updateDoc(doc(db, 'boxes', currentBox.box_id), { box_image_url: null });
+    currentBox.box_image_url = null;
+    renderImageSection();
     showToast('Photo removed ✓');
   } catch(e) { showToast('Failed to remove photo'); }
 };
@@ -785,7 +798,7 @@ window.escHtml = (str) => {
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.2</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.3</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -896,9 +909,9 @@ window.escHtml = (str) => {
 </body>
 </html>
 Done
-There's the complete v3.2 code — copy everything above and paste it into GitHub replacing all the old content. Once you see v3.2 in the top left, all three issues should be fixed:
+Copy all of that and paste it into GitHub replacing the old content. Once you see v3.3 you'll have:
 
-✅ Yellow search highlighting
-✅ Box photo add/replace button in edit mode
-✅ Item photo add/replace/delete buttons in edit mode
+✅ 🗑 Remove button on box photos (red, bottom right of image in edit mode)
+✅ 📷 Replace button also visible alongside it
+✅ No more stray text at the bottom of the page
 
