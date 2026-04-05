@@ -34,12 +34,12 @@ const db = getFirestore(app);
 let currentUser = null;
 let currentBox = null;
 let currentItems = [];
-let editMode = false;
-let lastSearchQuery = '';
+window.editMode = false;
+window.lastSearchQuery = '';
 let searchTimeout = null;
 let scannerStream = null;
 let scannerInterval = null;
-let pendingItemImageId = null;
+window.pendingItemImageId = null;
 let nextBarcode = null;
 
 // ── AUTH STATE ────────────────────────────────────────────
@@ -144,7 +144,7 @@ async function searchItems(query) {
 
     // If single box match and no items, open it directly
     if (!results.length && boxResults.length === 1) {
-      lastSearchQuery = query;
+      window.lastSearchQuery = query;
       openBox(boxResults[0].box_id);
       container.innerHTML = ''; label.textContent = ''; return;
     }
@@ -190,7 +190,7 @@ async function searchItems(query) {
 
 // ── BOX DETAIL ────────────────────────────────────────────
 window.openBox = async (boxId) => {
-  editMode = false;
+  window.editMode = false;
   currentBox = null;
   currentItems = [];
   document.getElementById('edit-mode-bar').classList.remove('visible');
@@ -230,7 +230,7 @@ function renderBoxDetail() {
 }
 
 function renderMeta() {
-  if (editMode) {
+  if (window.editMode) {
     document.getElementById('modal-meta').innerHTML = `
       <div class="modal-meta-item">
         <div class="modal-meta-label">Location</div>
@@ -259,9 +259,9 @@ function renderImageSection() {
     sec.innerHTML = `
       <div class="modal-image-wrap">
         <img class="modal-image" src="${escHtml(currentBox.box_image_url)}" alt="Box contents" onerror="this.style.display='none'">
-        ${editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
+        ${window.editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
       </div>`;
-  } else if (editMode) {
+  } else if (window.editMode) {
     sec.innerHTML = `
       <div class="modal-image-placeholder">
         <button class="modal-image-placeholder-btn" onclick="document.getElementById('box-image-input').click()">📷 Add box photo</button>
@@ -280,7 +280,7 @@ function renderItems() {
 }
 
 function renderItemRow(item) {
-  if (editMode) {
+  if (window.editMode) {
     return `<li class="item-row" id="item-row-${item.id}">
       <span class="item-dot"></span>
       <input class="item-name-input" value="${escHtml(item.item_name)}" spellcheck="true"
@@ -289,8 +289,8 @@ function renderItemRow(item) {
       <div class="item-actions">
         <button class="item-btn save" onclick="saveItemName('${item.id}', document.getElementById('item-input-${item.id}').value)" title="Save">✓</button>
         ${item.item_image_url
-          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()"><button class="item-btn delete" onclick="deleteItemPhoto('${item.id}')" title="Delete photo">🖼✕</button>`
-          : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()">+</button>`}
+          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="window.pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()"><button class="item-btn delete" onclick="deleteItemPhoto('${item.id}')" title="Delete photo">🖼✕</button>`
+          : `<button class="item-photo-add" title="Add photo" onclick="window.pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()">+</button>`}
         <button class="item-btn delete" onclick="confirmDeleteItem('${item.id}', '${escHtml(item.item_name).replace(/'/g,'&#39;')}')" title="Delete item">🗑</button>
       </div>
     </li>`;
@@ -305,10 +305,10 @@ function renderItemRow(item) {
 
 // ── EDIT MODE ─────────────────────────────────────────────
 window.toggleEditMode = () => {
-  editMode = !editMode;
+  window.editMode = !window.editMode;
   document.getElementById('edit-toggle-btn').textContent = editMode ? '✓ Done' : '✏️ Edit';
-  document.getElementById('edit-mode-bar').classList.toggle('visible', editMode);
-  document.getElementById('add-item-section').style.display = editMode ? 'block' : 'none';
+  document.getElementById('edit-mode-bar').classList.toggle('visible', window.editMode);
+  document.getElementById('add-item-section').style.display = window.editMode ? 'block' : 'none';
   renderMeta();
   renderImageSection();
   renderItems();
@@ -462,7 +462,7 @@ window.createBox = async () => {
     closeAddBox();
     showToast(`${newId} created ✓`);
     loadStats();
-    lastSearchQuery = '';
+    window.lastSearchQuery = '';
     openBox(newId);
   } catch(e) { showToast('Failed to create box'); console.error(e); }
   finally { btn.disabled = false; btn.textContent = 'Create Box'; }
@@ -498,19 +498,19 @@ window.uploadBoxImage = async (input) => {
 };
 
 window.uploadItemImage = async (input) => {
-  if (!input.files[0] || !pendingItemImageId) return;
+  if (!input.files[0] || !window.pendingItemImageId) return;
   const file = input.files[0];
   showToast('Uploading…');
   try {
-    const url = await uploadToCloudinary(file, `workshop/items/${pendingItemImageId}_${Date.now()}`);
-    await updateDoc(doc(db, 'items', pendingItemImageId), { item_image_url: url });
-    const item = currentItems.find(i => i.id === pendingItemImageId);
+    const url = await uploadToCloudinary(file, `workshop/items/${window.pendingItemImageId}_${Date.now()}`);
+    await updateDoc(doc(db, 'items', window.pendingItemImageId), { item_image_url: url });
+    const item = currentItems.find(i => i.id === window.pendingItemImageId);
     if (item) item.item_image_url = url;
     renderItems();
     showToast('Photo saved ✓');
   } catch(e) { showToast('Upload failed'); }
   input.value = '';
-  pendingItemImageId = null;
+  window.pendingItemImageId = null;
 };
 
 // ── SCANNER ───────────────────────────────────────────────
@@ -546,7 +546,7 @@ async function lookupBarcode(barcode) {
   try {
     const snap = await getDocs(query(collection(db, 'boxes'), where('barcode', '==', clean), limit(1)));
     if (!snap.empty) {
-      lastSearchQuery = '';
+      window.lastSearchQuery = '';
       openBox(snap.docs[0].data().box_id);
     } else {
       alert(`No box found for barcode: ${clean}`);
@@ -557,7 +557,7 @@ async function lookupBarcode(barcode) {
 // ── MODAL ─────────────────────────────────────────────────
 window.closeModalDirect = () => {
   document.getElementById('modal-overlay').classList.remove('open');
-  editMode = false; currentBox = null; currentItems = [];
+  window.editMode = false; currentBox = null; currentItems = [];
 };
 
 // ── CONFIRM ───────────────────────────────────────────────
@@ -582,8 +582,8 @@ window.showToast = (msg) => {
 window.highlight = (str) => {
   if (!str) return '';
   const safe = escHtml(String(str));
-  if (!lastSearchQuery.trim()) return safe;
-  const terms = lastSearchQuery.trim().split(/\s+/).filter(Boolean);
+  if (!window.lastSearchQuery.trim()) return safe;
+  const terms = window.lastSearchQuery.trim().split(/\s+/).filter(Boolean);
   let result = safe;
   terms.forEach(term => {
     const esc = escHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -598,9 +598,7 @@ window.escHtml = (str) => {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 };
 
-// Expose for inline handlers
-window.lastSearchQuery = lastSearchQuery;
-window.pendingItemImageId = pendingItemImageId;
+// window variables exposed globally for inline handlers
 </script>
 <style>
   :root {
@@ -787,7 +785,7 @@ window.pendingItemImageId = pendingItemImageId;
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.1</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.2</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -897,3 +895,10 @@ window.pendingItemImageId = pendingItemImageId;
 
 </body>
 </html>
+Done
+There's the complete v3.2 code — copy everything above and paste it into GitHub replacing all the old content. Once you see v3.2 in the top left, all three issues should be fixed:
+
+✅ Yellow search highlighting
+✅ Box photo add/replace button in edit mode
+✅ Item photo add/replace/delete buttons in edit mode
+
