@@ -1,5 +1,3 @@
-Output
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +5,7 @@ Output
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Workshop Inventory</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -529,29 +527,45 @@ window.uploadItemImage = async (input) => {
 };
 
 // ── SCANNER ───────────────────────────────────────────────
+let zxingReader = null;
+
 window.toggleScanner = async () => {
   const wrap = document.getElementById('scanner-wrap');
   if (wrap.style.display === 'block') { stopScanner(); return; }
   wrap.style.display = 'block';
   try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    document.getElementById('scanner-video').srcObject = scannerStream;
-    scannerInterval = setInterval(() => {
-      const video = document.getElementById('scanner-video');
-      const canvas = document.getElementById('scanner-canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (code) { stopScanner(); lookupBarcode(code.data); }
-    }, 300);
-  } catch(e) { stopScanner(); alert('Camera access denied or not available.'); }
+    const hints = new Map();
+    const formats = [
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.QR_CODE,
+      ZXing.BarcodeFormat.DATA_MATRIX,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+    ];
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+    const video = document.getElementById('scanner-video');
+    await zxingReader.decodeFromConstraints(
+      { video: { facingMode: 'environment' } },
+      video,
+      (result, err) => {
+        if (result) {
+          stopScanner();
+          lookupBarcode(result.getText());
+        }
+      }
+    );
+  } catch(e) {
+    stopScanner();
+    alert('Camera access denied or not available.');
+  }
 };
 
 function stopScanner() {
-  clearInterval(scannerInterval);
-  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  if (zxingReader) { zxingReader.reset(); zxingReader = null; }
   document.getElementById('scanner-wrap').style.display = 'none';
 }
 window.stopScanner = stopScanner;
@@ -800,7 +814,7 @@ window.escHtml = (str) => {
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.3</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.4</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -825,7 +839,6 @@ window.escHtml = (str) => {
       <div id="scanner-wrap">
         <div class="scanner-header"><span>Point camera at barcode</span><button class="scanner-close" onclick="stopScanner()">×</button></div>
         <video id="scanner-video" playsinline autoplay muted></video>
-        <canvas id="scanner-canvas" style="display:none"></canvas>
         <div class="scanner-hint">Hold steady — scanning automatically</div>
       </div>
     </div>
