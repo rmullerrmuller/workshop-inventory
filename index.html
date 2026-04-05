@@ -6,28 +6,614 @@
 <title>Workshop Inventory</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+// ── FIREBASE CONFIG ───────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyDxw1JW8lPvV8mWjbT205sTOA-PB412m1w",
+  authDomain: "workshop-inventory-dedd5.firebaseapp.com",
+  projectId: "workshop-inventory-dedd5",
+  storageBucket: "workshop-inventory-dedd5.firebasestorage.app",
+  messagingSenderId: "810581725376",
+  appId: "1:810581725376:web:91a51cdf9ff2c550d4dd25"
+};
+
+// ── CLOUDINARY CONFIG ─────────────────────────────────────
+const CLOUD_NAME = 'diymyvvvb';
+const UPLOAD_PRESET = 'workshop_inventory';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ── STATE ─────────────────────────────────────────────────
+let currentUser = null;
+let currentBox = null;
+let currentItems = [];
+let editMode = false;
+let lastSearchQuery = '';
+let searchTimeout = null;
+let scannerStream = null;
+let scannerInterval = null;
+let pendingItemImageId = null;
+let nextBarcode = null;
+
+// ── AUTH STATE ────────────────────────────────────────────
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  if (user) {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    loadStats();
+  } else {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app-screen').style.display = 'none';
+  }
+});
+
+// ── LOGIN ─────────────────────────────────────────────────
+window.handleLogin = async () => {
+  const email = document.getElementById('email-input').value.trim();
+  const password = document.getElementById('password-input').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('auth-error');
+  if (!email || !password) { err.textContent = 'Please enter email and password.'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch(e) {
+    err.textContent = 'Invalid email or password.';
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+};
+
+window.handleLogout = async () => {
+  await signOut(auth);
+  stopScanner();
+};
+
+// ── STATS ─────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const boxSnap = await getDocs(collection(db, 'boxes'));
+    const itemSnap = await getDocs(collection(db, 'items'));
+    document.getElementById('stats-bar').innerHTML = `
+      <div class="stat-chip"><strong>${boxSnap.size}</strong> boxes</div>
+      <div class="stat-chip"><strong>${itemSnap.size}</strong> items</div>`;
+  } catch(e) {}
+}
+
+// ── SEARCH ────────────────────────────────────────────────
+window.handleSearch = (val) => {
+  document.getElementById('search-clear').style.display = val ? 'block' : 'none';
+  clearTimeout(searchTimeout);
+  if (!val.trim()) { showEmpty(); return; }
+  searchTimeout = setTimeout(() => searchItems(val.trim()), 400);
+};
+
+window.clearSearch = () => {
+  document.getElementById('search-input').value = '';
+  document.getElementById('search-clear').style.display = 'none';
+  showEmpty();
+};
+
+function showEmpty() {
+  document.getElementById('results-label').textContent = '';
+  document.getElementById('results-container').innerHTML = '';
+}
+
+async function searchItems(query) {
+  const container = document.getElementById('results-container');
+  const label = document.getElementById('results-label');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching…</div>';
+
+  try {
+    const queryLower = query.toLowerCase();
+    const results = [];
+    const boxResults = [];
+
+    // Search all items (Firestore doesn't have full-text search so we fetch and filter)
+    const itemsSnap = await getDocs(collection(db, 'items'));
+    const boxCache = {};
+
+    itemsSnap.forEach(d => {
+      const item = { id: d.id, ...d.data() };
+      if (item.item_name.toLowerCase().includes(queryLower)) {
+        results.push(item);
+      }
+    });
+
+    // Search boxes by id, description, location
+    const boxesSnap = await getDocs(collection(db, 'boxes'));
+    boxesSnap.forEach(d => {
+      const box = { id: d.id, ...d.data() };
+      boxCache[box.box_id] = box;
+      if (
+        box.box_id.toLowerCase().includes(queryLower) ||
+        (box.description || '').toLowerCase().includes(queryLower) ||
+        (box.location || '').toLowerCase().includes(queryLower) ||
+        (box.barcode || '').toLowerCase().includes(queryLower)
+      ) {
+        boxResults.push(box);
+      }
+    });
+
+    // If single box match and no items, open it directly
+    if (!results.length && boxResults.length === 1) {
+      lastSearchQuery = query;
+      openBox(boxResults[0].box_id);
+      container.innerHTML = ''; label.textContent = ''; return;
+    }
+
+    let html = '';
+    if (boxResults.length) {
+      html += boxResults.map(box => `
+        <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(box.box_id)}')">
+          <div class="result-top">
+            <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
+            <div class="result-box-id">${escHtml(box.box_id)}</div>
+          </div>
+          ${box.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(box.location)}</div></div>` : ''}
+          <div class="result-description">Click to view all contents</div>
+        </div>`).join('');
+    }
+
+    html += results.map(item => {
+      const box = boxCache[item.box_id] || {};
+      return `
+        <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(item.box_id)}')">
+          <div class="result-top">
+            <div class="result-item">${escHtml(item.item_name)}</div>
+            <div class="result-box-id">${escHtml(item.box_id)}</div>
+          </div>
+          ${box.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(box.location)}</div></div>` : ''}
+          ${box.description ? `<div class="result-description">${escHtml(box.description)}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const total = results.length + boxResults.length;
+    if (!total) {
+      label.textContent = '';
+      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>No results for "<strong>${escHtml(query)}</strong>"</p></div>`;
+      return;
+    }
+    label.textContent = `${total} result${total !== 1 ? 's' : ''} for "${query}"`;
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state"><p>Error searching. Please try again.</p></div>`;
+  }
+}
+
+// ── BOX DETAIL ────────────────────────────────────────────
+window.openBox = async (boxId) => {
+  editMode = false;
+  currentBox = null;
+  currentItems = [];
+  document.getElementById('edit-mode-bar').classList.remove('visible');
+  document.getElementById('edit-toggle-btn').textContent = '✏️ Edit';
+  document.getElementById('add-item-section').style.display = 'none';
+  document.getElementById('modal-box-id').textContent = boxId;
+  document.getElementById('modal-title').textContent = 'Loading…';
+  document.getElementById('modal-meta').innerHTML = '';
+  document.getElementById('modal-items').innerHTML = '<li style="color:var(--muted);padding:12px 0;font-size:14px">Loading…</li>';
+  document.getElementById('modal-image-section').innerHTML = '';
+  document.getElementById('modal-overlay').classList.add('open');
+
+  try {
+    const boxDoc = await getDoc(doc(db, 'boxes', boxId));
+    if (!boxDoc.exists()) return;
+    currentBox = { id: boxDoc.id, ...boxDoc.data() };
+
+    const itemsSnap = await getDocs(query(
+      collection(db, 'items'),
+      where('box_id', '==', boxId),
+      orderBy('item_name')
+    ));
+    currentItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    renderBoxDetail();
+  } catch(e) {
+    document.getElementById('modal-title').textContent = 'Error loading box';
+  }
+};
+
+function renderBoxDetail() {
+  document.getElementById('modal-title').innerHTML = highlight(currentBox.description || currentBox.box_id);
+  document.getElementById('modal-box-id').innerHTML = highlight(currentBox.box_id);
+  renderMeta();
+  renderImageSection();
+  renderItems();
+}
+
+function renderMeta() {
+  if (editMode) {
+    document.getElementById('modal-meta').innerHTML = `
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Location</div>
+        <input class="modal-meta-input" id="edit-location" value="${escHtml(currentBox.location || '')}" placeholder="e.g. SR02A" spellcheck="false" onblur="saveBoxField('location', this.value)">
+      </div>
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Description</div>
+        <input class="modal-meta-input wide" id="edit-description" value="${escHtml(currentBox.description || '')}" placeholder="Box description" spellcheck="true" onblur="saveBoxField('description', this.value)">
+      </div>
+      <div class="modal-meta-item">
+        <div class="modal-meta-label">Barcode</div>
+        <input class="modal-meta-input" id="edit-barcode" value="${escHtml(currentBox.barcode || '')}" placeholder="e.g. 990123" spellcheck="false" onblur="saveBoxField('barcode', this.value)">
+      </div>`;
+  } else {
+    document.getElementById('modal-meta').innerHTML = `
+      ${currentBox.location ? `<div class="modal-meta-item"><div class="modal-meta-label">Location</div><div class="modal-meta-value">${highlight(currentBox.location)}</div></div>` : ''}
+      ${currentBox.description ? `<div class="modal-meta-item"><div class="modal-meta-label">Description</div><div class="modal-meta-value" style="font-family:var(--sans)">${highlight(currentBox.description)}</div></div>` : ''}
+      ${currentBox.barcode ? `<div class="modal-meta-item"><div class="modal-meta-label">Barcode</div><div class="modal-meta-value">${highlight(currentBox.barcode)}</div></div>` : ''}
+      <div class="modal-meta-item"><div class="modal-meta-label">Items</div><div class="modal-meta-value" id="item-count-display">${currentItems.length}</div></div>`;
+  }
+}
+
+function renderImageSection() {
+  const sec = document.getElementById('modal-image-section');
+  if (currentBox.box_image_url) {
+    sec.innerHTML = `
+      <div class="modal-image-wrap">
+        <img class="modal-image" src="${escHtml(currentBox.box_image_url)}" alt="Box contents" onerror="this.style.display='none'">
+        ${editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
+      </div>`;
+  } else if (editMode) {
+    sec.innerHTML = `
+      <div class="modal-image-placeholder">
+        <button class="modal-image-placeholder-btn" onclick="document.getElementById('box-image-input').click()">📷 Add box photo</button>
+      </div>`;
+  } else {
+    sec.innerHTML = '';
+  }
+}
+
+function renderItems() {
+  const count = document.getElementById('item-count-display');
+  if (count) count.textContent = currentItems.length;
+  document.getElementById('modal-items').innerHTML = currentItems.length
+    ? currentItems.map(item => renderItemRow(item)).join('')
+    : `<li style="color:var(--muted);padding:12px 0;font-size:14px">No items recorded</li>`;
+}
+
+function renderItemRow(item) {
+  if (editMode) {
+    return `<li class="item-row" id="item-row-${item.id}">
+      <span class="item-dot"></span>
+      <input class="item-name-input" value="${escHtml(item.item_name)}" spellcheck="true"
+        id="item-input-${item.id}"
+        onkeydown="if(event.key==='Enter'){saveItemName('${item.id}',this.value)}">
+      <div class="item-actions">
+        <button class="item-btn save" onclick="saveItemName('${item.id}', document.getElementById('item-input-${item.id}').value)" title="Save">✓</button>
+        ${item.item_image_url
+          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()"><button class="item-btn delete" onclick="deleteItemPhoto('${item.id}')" title="Delete photo">🖼✕</button>`
+          : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId='${item.id}';document.getElementById('item-image-input').click()">+</button>`}
+        <button class="item-btn delete" onclick="confirmDeleteItem('${item.id}', '${escHtml(item.item_name).replace(/'/g,'&#39;')}')" title="Delete item">🗑</button>
+      </div>
+    </li>`;
+  } else {
+    return `<li class="item-row">
+      <span class="item-dot"></span>
+      <span class="item-name-view">${highlight(item.item_name)}</span>
+      ${item.item_image_url ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="View photo" onclick="window.open('${escHtml(item.item_image_url)}','_blank')">` : ''}
+    </li>`;
+  }
+}
+
+// ── EDIT MODE ─────────────────────────────────────────────
+window.toggleEditMode = () => {
+  editMode = !editMode;
+  document.getElementById('edit-toggle-btn').textContent = editMode ? '✓ Done' : '✏️ Edit';
+  document.getElementById('edit-mode-bar').classList.toggle('visible', editMode);
+  document.getElementById('add-item-section').style.display = editMode ? 'block' : 'none';
+  renderMeta();
+  renderImageSection();
+  renderItems();
+};
+
+// ── SAVE BOX FIELD ────────────────────────────────────────
+window.saveBoxField = async (field, value) => {
+  if (!currentBox) return;
+  try {
+    await updateDoc(doc(db, 'boxes', currentBox.box_id), { [field]: value.trim() || null });
+    currentBox[field] = value.trim() || null;
+    if (field === 'description') document.getElementById('modal-title').innerHTML = highlight(value.trim() || currentBox.box_id);
+    showToast('Saved ✓');
+  } catch(e) { showToast('Save failed'); }
+};
+
+// ── SAVE ITEM ─────────────────────────────────────────────
+window.saveItemName = async (itemId, newName) => {
+  if (!newName.trim()) { showToast('Item name cannot be empty'); return; }
+  try {
+    await updateDoc(doc(db, 'items', itemId), { item_name: newName.trim() });
+    const item = currentItems.find(i => i.id === itemId);
+    if (item) item.item_name = newName.trim();
+    showToast('Saved ✓');
+  } catch(e) { showToast('Save failed'); }
+};
+
+// ── ADD ITEM ──────────────────────────────────────────────
+window.addItem = async () => {
+  const input = document.getElementById('new-item-input');
+  const name = input.value.trim();
+  if (!name || !currentBox) return;
+  try {
+    const ref = await addDoc(collection(db, 'items'), {
+      box_id: currentBox.box_id,
+      item_name: name,
+      item_image_url: null
+    });
+    currentItems.push({ id: ref.id, box_id: currentBox.box_id, item_name: name, item_image_url: null });
+    currentItems.sort((a, b) => a.item_name.localeCompare(b.item_name));
+    input.value = '';
+    input.focus();
+    renderItems();
+    showToast('Item added ✓');
+    loadStats();
+  } catch(e) { showToast('Failed to add item'); }
+};
+
+// ── DELETE ITEM ───────────────────────────────────────────
+window.confirmDeleteItem = (itemId, itemName) => {
+  showConfirm('Delete item?', `"${itemName}" will be permanently removed.`, async () => {
+    try {
+      await deleteDoc(doc(db, 'items', itemId));
+      currentItems = currentItems.filter(i => i.id !== itemId);
+      renderItems();
+      showToast('Item deleted');
+      loadStats();
+    } catch(e) { showToast('Delete failed'); }
+  });
+};
+
+// ── DELETE ITEM PHOTO ─────────────────────────────────────
+window.deleteItemPhoto = async (itemId) => {
+  try {
+    await updateDoc(doc(db, 'items', itemId), { item_image_url: null });
+    const item = currentItems.find(i => i.id === itemId);
+    if (item) item.item_image_url = null;
+    renderItems();
+    showToast('Photo removed ✓');
+  } catch(e) { showToast('Failed to remove photo'); }
+};
+
+// ── DELETE BOX ────────────────────────────────────────────
+window.confirmDeleteBox = () => {
+  if (!currentBox) return;
+  showConfirm(`Delete ${currentBox.box_id}?`,
+    `This will permanently delete this box and all ${currentItems.length} items. This cannot be undone.`,
+    async () => {
+      try {
+        for (const item of currentItems) await deleteDoc(doc(db, 'items', item.id));
+        await deleteDoc(doc(db, 'boxes', currentBox.box_id));
+        closeModalDirect();
+        showToast(`${currentBox.box_id} deleted`);
+        loadStats();
+        clearSearch();
+      } catch(e) { showToast('Delete failed'); }
+    });
+};
+
+// ── ADD BOX ───────────────────────────────────────────────
+window.openAddBox = async () => {
+  nextBarcode = null;
+  document.getElementById('new-box-barcode-preview').style.display = 'none';
+  document.getElementById('new-box-barcode-value').textContent = '—';
+  document.getElementById('new-box-location').value = '';
+  document.getElementById('new-box-description').value = '';
+  document.getElementById('add-box-overlay').classList.add('open');
+
+  try {
+    const snap = await getDocs(collection(db, 'boxes'));
+    const barcodes = new Set();
+    let maxNum = 0;
+    snap.forEach(d => {
+      const b = d.data();
+      if (b.barcode) barcodes.add(b.barcode);
+      const m = (b.box_id || '').match(/(\d+)/);
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+    });
+    window._nextBoxNum = maxNum + 1;
+
+    let candidate = 990000;
+    while (barcodes.has(String(candidate))) candidate++;
+    nextBarcode = String(candidate);
+    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
+    document.getElementById('new-box-barcode-preview').style.display = 'flex';
+  } catch(e) {
+    nextBarcode = String(990000 + Math.floor(Math.random() * 9000));
+    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
+    document.getElementById('new-box-barcode-preview').style.display = 'flex';
+  }
+};
+
+window.closeAddBox = () => document.getElementById('add-box-overlay').classList.remove('open');
+
+window.createBox = async () => {
+  const location = document.getElementById('new-box-location').value.trim();
+  const description = document.getElementById('new-box-description').value.trim();
+  const btn = document.getElementById('create-box-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    const newId = `rBox_${String(window._nextBoxNum || 1).padStart(3, '0')}`;
+    await addDoc(collection(db, 'boxes'), {
+      box_id: newId,
+      location: location || null,
+      description: description || null,
+      barcode: nextBarcode,
+      box_image_url: null
+    });
+    // Also set as document ID for easy lookup
+    await updateDoc(doc(db, 'boxes', newId), {}).catch(async () => {
+      // If doc doesn't exist with that ID, use setDoc
+      const { setDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
+      await setDoc(doc(db, 'boxes', newId), {
+        box_id: newId,
+        location: location || null,
+        description: description || null,
+        barcode: nextBarcode,
+        box_image_url: null
+      });
+    });
+    closeAddBox();
+    showToast(`${newId} created ✓`);
+    loadStats();
+    lastSearchQuery = '';
+    openBox(newId);
+  } catch(e) { showToast('Failed to create box'); console.error(e); }
+  finally { btn.disabled = false; btn.textContent = 'Create Box'; }
+};
+
+// ── IMAGE UPLOAD via Cloudinary ───────────────────────────
+async function uploadToCloudinary(file, publicId) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('public_id', publicId);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+    method: 'POST',
+    body: formData
+  });
+  if (!res.ok) throw new Error('Upload failed');
+  const data = await res.json();
+  return data.secure_url;
+}
+
+window.uploadBoxImage = async (input) => {
+  if (!input.files[0] || !currentBox) return;
+  const file = input.files[0];
+  showToast('Uploading…');
+  try {
+    const url = await uploadToCloudinary(file, `workshop/boxes/${currentBox.box_id}`);
+    await updateDoc(doc(db, 'boxes', currentBox.box_id), { box_image_url: url });
+    currentBox.box_image_url = url;
+    renderImageSection();
+    showToast('Photo saved ✓');
+  } catch(e) { showToast('Upload failed'); }
+  input.value = '';
+};
+
+window.uploadItemImage = async (input) => {
+  if (!input.files[0] || !pendingItemImageId) return;
+  const file = input.files[0];
+  showToast('Uploading…');
+  try {
+    const url = await uploadToCloudinary(file, `workshop/items/${pendingItemImageId}_${Date.now()}`);
+    await updateDoc(doc(db, 'items', pendingItemImageId), { item_image_url: url });
+    const item = currentItems.find(i => i.id === pendingItemImageId);
+    if (item) item.item_image_url = url;
+    renderItems();
+    showToast('Photo saved ✓');
+  } catch(e) { showToast('Upload failed'); }
+  input.value = '';
+  pendingItemImageId = null;
+};
+
+// ── SCANNER ───────────────────────────────────────────────
+window.toggleScanner = async () => {
+  const wrap = document.getElementById('scanner-wrap');
+  if (wrap.style.display === 'block') { stopScanner(); return; }
+  wrap.style.display = 'block';
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    document.getElementById('scanner-video').srcObject = scannerStream;
+    scannerInterval = setInterval(() => {
+      const video = document.getElementById('scanner-video');
+      const canvas = document.getElementById('scanner-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code) { stopScanner(); lookupBarcode(code.data); }
+    }, 300);
+  } catch(e) { stopScanner(); alert('Camera access denied or not available.'); }
+};
+
+function stopScanner() {
+  clearInterval(scannerInterval);
+  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  document.getElementById('scanner-wrap').style.display = 'none';
+}
+window.stopScanner = stopScanner;
+
+async function lookupBarcode(barcode) {
+  const clean = barcode.replace(/^\*/, '');
+  try {
+    const snap = await getDocs(query(collection(db, 'boxes'), where('barcode', '==', clean), limit(1)));
+    if (!snap.empty) {
+      lastSearchQuery = '';
+      openBox(snap.docs[0].data().box_id);
+    } else {
+      alert(`No box found for barcode: ${clean}`);
+    }
+  } catch(e) { alert('Error looking up barcode.'); }
+}
+
+// ── MODAL ─────────────────────────────────────────────────
+window.closeModalDirect = () => {
+  document.getElementById('modal-overlay').classList.remove('open');
+  editMode = false; currentBox = null; currentItems = [];
+};
+
+// ── CONFIRM ───────────────────────────────────────────────
+window.showConfirm = (title, message, onOk) => {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-message').textContent = message;
+  document.getElementById('confirm-ok-btn').onclick = () => { closeConfirm(); onOk(); };
+  document.getElementById('confirm-overlay').classList.add('open');
+};
+window.closeConfirm = () => document.getElementById('confirm-overlay').classList.remove('open');
+
+// ── TOAST ─────────────────────────────────────────────────
+let toastTimer;
+window.showToast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+};
+
+// ── HIGHLIGHT ─────────────────────────────────────────────
+window.highlight = (str) => {
+  if (!str) return '';
+  const safe = escHtml(String(str));
+  if (!lastSearchQuery.trim()) return safe;
+  const terms = lastSearchQuery.trim().split(/\s+/).filter(Boolean);
+  let result = safe;
+  terms.forEach(term => {
+    const esc = escHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(esc, 'gi'), m => `<mark style="background:#fff176;border-radius:2px;padding:0 1px">${m}</mark>`);
+  });
+  return result;
+};
+
+// ── HELPERS ───────────────────────────────────────────────
+window.escHtml = (str) => {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+};
+
+// Expose for inline handlers
+window.lastSearchQuery = lastSearchQuery;
+window.pendingItemImageId = pendingItemImageId;
+</script>
 <style>
   :root {
-    --bg: #f7f6f3;
-    --surface: #ffffff;
-    --border: #e8e6e0;
-    --text: #1a1a18;
-    --muted: #8a8880;
-    --accent: #2d5a27;
-    --accent-light: #e8f0e7;
-    --accent-hover: #234820;
-    --danger: #c0392b;
-    --danger-light: #fdf0ee;
-    --mono: 'DM Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-    --radius: 10px;
-    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
+    --bg: #f7f6f3; --surface: #ffffff; --border: #e8e6e0;
+    --text: #1a1a18; --muted: #8a8880;
+    --accent: #2d5a27; --accent-light: #e8f0e7; --accent-hover: #234820;
+    --danger: #c0392b; --danger-light: #fdf0ee;
+    --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+    --radius: 10px; --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.06);
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  /* ── AUTH ── */
   #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
   .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 48px 40px; width: 100%; max-width: 400px; box-shadow: var(--shadow); }
   .auth-logo { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 32px; }
@@ -35,17 +621,13 @@
   .auth-card p { color: var(--muted); font-size: 14px; margin-bottom: 32px; }
   .form-group { margin-bottom: 16px; }
   .form-group label { display: block; font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-  .form-group input {
-    width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-    font-family: var(--sans); font-size: 15px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s;
-  }
+  .form-group input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius); font-family: var(--sans); font-size: 15px; background: var(--bg); color: var(--text); outline: none; transition: border-color 0.15s; }
   .form-group input:focus { border-color: var(--accent); background: white; }
   .btn-primary { width: 100%; padding: 13px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-family: var(--sans); font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s; margin-top: 8px; }
   .btn-primary:hover { background: var(--accent-hover); }
   .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
   .auth-error { color: var(--danger); font-size: 13px; margin-top: 12px; text-align: center; }
 
-  /* ── TOPBAR ── */
   #app-screen { display: none; min-height: 100vh; }
   .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .topbar-logo { font-family: var(--mono); font-size: 12px; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; }
@@ -54,13 +636,10 @@
   .btn-icon.accent { background: var(--accent); color: white; border-color: var(--accent); }
   .btn-icon.accent:hover { background: var(--accent-hover); }
 
-  /* ── MAIN ── */
   .main { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
   .hero { text-align: center; margin-bottom: 40px; }
   .hero h2 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 6px; }
   .hero p { color: var(--muted); font-size: 14px; }
-
-  /* ── SEARCH ── */
   .search-wrap { position: relative; margin-top: 28px; }
   .search-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
   #search-input { width: 100%; padding: 16px 56px 16px 48px; border: 1.5px solid var(--border); border-radius: 12px; font-family: var(--sans); font-size: 16px; background: var(--surface); color: var(--text); outline: none; box-shadow: var(--shadow); transition: border-color 0.15s, box-shadow 0.15s; }
@@ -69,7 +648,6 @@
   .scan-btn { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px auto 0; padding: 10px 20px; background: var(--accent-light); color: var(--accent); border: 1.5px solid rgba(45,90,39,0.2); border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
   .scan-btn:hover { background: #dce8db; }
 
-  /* ── SCANNER ── */
   #scanner-wrap { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 16px; box-shadow: var(--shadow); }
   .scanner-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
   .scanner-header span { font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -77,12 +655,10 @@
   #scanner-video { width: 100%; max-height: 280px; object-fit: cover; display: block; }
   .scanner-hint { padding: 10px 16px; font-size: 12px; color: var(--muted); text-align: center; }
 
-  /* ── STATS ── */
   .stats-bar { display: flex; gap: 12px; margin-bottom: 24px; }
   .stat-chip { font-family: var(--mono); font-size: 11px; color: var(--muted); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 10px; }
   .stat-chip strong { color: var(--text); font-weight: 500; }
 
-  /* ── RESULTS ── */
   #results-label { font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
   .result-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; animation: fadeIn 0.2s ease; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -94,32 +670,16 @@
   .result-meta-item { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); }
   .result-description { font-size: 13px; color: var(--muted); margin-top: 4px; font-style: italic; }
 
-  /* ── MODAL — slides up from bottom, NO click-outside-to-close ── */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.45); z-index: 200;
-    align-items: flex-end; justify-content: center;
-    /* pointer-events on overlay itself are disabled so clicking outside does nothing */
-    pointer-events: none;
-  }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: flex-end; justify-content: center; pointer-events: none; }
   .modal-overlay.open { display: flex; animation: fadeOverlay 0.2s ease; }
   @keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
-
-  .modal {
-    background: var(--surface); border-radius: 16px 16px 0 0;
-    width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
-    animation: slideUp 0.25s ease;
-    pointer-events: all; /* re-enable on the modal itself */
-    box-shadow: 0 -4px 40px rgba(0,0,0,0.15);
-  }
+  .modal { background: var(--surface); border-radius: 16px 16px 0 0; width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.25s ease; pointer-events: all; box-shadow: 0 -4px 40px rgba(0,0,0,0.15); }
   @keyframes slideUp { from { transform: translateY(40px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
-
-  .modal-header { padding: 16px 20px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; }
+  .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; background: var(--surface); position: sticky; top: 0; z-index: 10; }
   .modal-header-left { flex: 1; min-width: 0; }
   .modal-box-id { font-family: var(--mono); font-size: 11px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 3px; }
-  .modal-title { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+  .modal-title { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
   .modal-header-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
   .btn-sm { padding: 7px 13px; border-radius: 7px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--muted); transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
   .btn-sm:hover { color: var(--text); border-color: #aaa; }
@@ -127,14 +687,11 @@
   .btn-sm.danger:hover { background: #f5c6c2; border-color: var(--danger); }
   .btn-sm.primary { color: white; border-color: var(--accent); background: var(--accent); }
   .btn-sm.primary:hover { background: var(--accent-hover); }
-  /* Close button is deliberately prominent */
   .btn-close { padding: 7px 14px; border-radius: 7px; font-family: var(--sans); font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid var(--border); background: var(--surface); color: var(--text); transition: all 0.15s; }
   .btn-close:hover { background: var(--bg); border-color: #999; }
-
   .edit-mode-bar { background: var(--accent-light); border-bottom: 1px solid rgba(45,90,39,0.2); padding: 8px 20px; display: none; align-items: center; justify-content: space-between; }
   .edit-mode-bar.visible { display: flex; }
   .edit-mode-bar span { font-size: 12px; color: var(--accent); font-weight: 500; }
-
   .modal-meta { padding: 12px 20px; display: flex; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: var(--bg); align-items: flex-start; }
   .modal-meta-item { display: flex; flex-direction: column; gap: 4px; }
   .modal-meta-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -142,18 +699,14 @@
   .modal-meta-input { font-family: var(--mono); font-size: 13px; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; background: white; outline: none; width: 140px; }
   .modal-meta-input:focus { border-color: var(--accent); }
   .modal-meta-input.wide { width: 210px; font-family: var(--sans); }
-
   .modal-image-wrap { position: relative; }
   .modal-image { width: 100%; max-height: 320px; object-fit: contain; display: block; background: #f0eeea; }
   .modal-image-overlay-btn { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.65); color: white; border: none; border-radius: 6px; padding: 7px 14px; font-size: 12px; cursor: pointer; font-family: var(--sans); font-weight: 500; }
   .modal-image-placeholder { border-bottom: 1px solid var(--border); padding: 14px 20px; }
   .modal-image-placeholder-btn { background: var(--accent-light); color: var(--accent); border: 1.5px dashed rgba(45,90,39,0.3); border-radius: 8px; padding: 14px 24px; font-size: 13px; cursor: pointer; font-family: var(--sans); width: 100%; transition: all 0.15s; }
   .modal-image-placeholder-btn:hover { background: #dce8db; }
-
   .modal-section { padding: 18px 20px; }
   .modal-section-title { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-
-  /* ── ITEMS ── */
   .item-list { list-style: none; }
   .item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
   .item-row:last-child { border-bottom: none; }
@@ -170,14 +723,11 @@
   .item-photo-thumb { width: 30px; height: 30px; border-radius: 4px; object-fit: cover; cursor: pointer; border: 1px solid var(--border); }
   .item-photo-add { width: 30px; height: 30px; border-radius: 4px; border: 1.5px dashed var(--border); background: none; cursor: pointer; color: var(--muted); font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
   .item-photo-add:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
-
   .add-item-row { display: flex; gap: 8px; margin-top: 16px; }
   .add-item-input { flex: 1; padding: 10px 12px; border: 1.5px dashed var(--border); border-radius: 8px; font-family: var(--sans); font-size: 14px; outline: none; background: var(--bg); transition: border-color 0.15s; }
   .add-item-input:focus { border-color: var(--accent); border-style: solid; background: white; }
   .add-item-btn { padding: 10px 18px; background: var(--accent); color: white; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
   .add-item-btn:hover { background: var(--accent-hover); }
-
-  /* ── CONFIRM ── */
   .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 400; align-items: center; justify-content: center; padding: 24px; pointer-events: none; }
   .confirm-overlay.open { display: flex; pointer-events: all; }
   .confirm-card { background: var(--surface); border-radius: 12px; padding: 28px; max-width: 360px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
@@ -187,8 +737,6 @@
   .btn-cancel { padding: 9px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: var(--sans); font-size: 14px; cursor: pointer; }
   .btn-cancel:hover { border-color: #aaa; }
   .btn-confirm-delete { padding: 9px 16px; background: var(--danger); color: white; border: none; border-radius: 8px; font-family: var(--sans); font-size: 14px; font-weight: 500; cursor: pointer; }
-
-  /* ── ADD BOX ── */
   .add-box-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300; align-items: center; justify-content: center; padding: 24px; pointer-events: none; }
   .add-box-overlay.open { display: flex; pointer-events: all; }
   .add-box-card { background: var(--surface); border-radius: 16px; padding: 32px; max-width: 420px; width: 100%; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
@@ -199,24 +747,17 @@
   .add-box-actions .btn-primary { flex: 2; margin-top: 0; }
   .barcode-preview { font-family: var(--mono); font-size: 13px; color: var(--accent); background: var(--accent-light); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .barcode-preview span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-
-  /* ── TOAST ── */
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a18; color: white; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 500; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
   .toast.show { opacity: 1; }
-
-  /* ── EMPTY / LOADING ── */
   .empty-state { text-align: center; padding: 60px 24px; color: var(--muted); }
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
   .empty-state p { font-size: 15px; }
   .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
   .spinner { width: 24px; height: 24px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
   @media (max-width: 520px) {
-    .main { padding: 24px 14px 80px; }
-    .hero h2 { font-size: 22px; }
-    .auth-card { padding: 32px 20px; }
-    .modal { max-height: 93vh; }
+    .main { padding: 24px 14px 80px; } .hero h2 { font-size: 22px; }
+    .auth-card { padding: 32px 20px; } .modal { max-height: 93vh; }
     .modal-header { flex-direction: column; gap: 10px; }
     .modal-header-actions { width: 100%; justify-content: flex-start; }
   }
@@ -232,11 +773,11 @@
     <p>Access your workshop inventory</p>
     <div class="form-group">
       <label>Email</label>
-      <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email">
+      <input type="email" id="email-input" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')handleLogin()">
     </div>
     <div class="form-group">
       <label>Password</label>
-      <input type="password" id="password-input" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" id="password-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')handleLogin()">
     </div>
     <button class="btn-primary" id="login-btn" onclick="handleLogin()">Sign in</button>
     <div class="auth-error" id="auth-error"></div>
@@ -246,7 +787,7 @@
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v2.2</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.0</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -255,7 +796,6 @@
       <button class="btn-icon" onclick="handleLogout()">Sign out</button>
     </div>
   </div>
-
   <div class="main">
     <div class="hero">
       <h2>Find anything in your shop</h2>
@@ -282,9 +822,9 @@
   </div>
 </div>
 
-<!-- BOX DETAIL MODAL — no click-outside-to-close -->
+<!-- BOX MODAL -->
 <div class="modal-overlay" id="modal-overlay">
-  <div class="modal" id="modal">
+  <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-header">
       <div class="modal-header-left">
@@ -298,7 +838,7 @@
       </div>
     </div>
     <div class="edit-mode-bar" id="edit-mode-bar">
-      <span>✏️ Edit mode — changes save when you click away from each field</span>
+      <span>✏️ Edit mode — changes save when you click away</span>
       <button class="btn-sm primary" onclick="toggleEditMode()">Done editing</button>
     </div>
     <div class="modal-meta" id="modal-meta"></div>
@@ -308,8 +848,7 @@
       <ul class="item-list" id="modal-items"></ul>
       <div id="add-item-section" style="display:none">
         <div class="add-item-row">
-          <input class="add-item-input" id="new-item-input" placeholder="Type new item and press Enter…" spellcheck="true"
-            onkeydown="if(event.key==='Enter'){addItem()}">
+          <input class="add-item-input" id="new-item-input" placeholder="Type new item and press Enter…" spellcheck="true" onkeydown="if(event.key==='Enter'){addItem()}">
           <button class="add-item-btn" onclick="addItem()">Add</button>
         </div>
       </div>
@@ -317,11 +856,11 @@
   </div>
 </div>
 
-<!-- ADD BOX MODAL — no click-outside-to-close -->
+<!-- ADD BOX -->
 <div class="add-box-overlay" id="add-box-overlay">
   <div class="add-box-card">
     <h3>New Box</h3>
-    <p class="add-box-subtitle">Barcode and ID are assigned automatically</p>
+    <p class="add-box-subtitle">Barcode and ID assigned automatically</p>
     <div id="new-box-barcode-preview" class="barcode-preview" style="display:none">
       <span>Barcode:</span> <strong id="new-box-barcode-value">—</strong>
     </div>
@@ -340,7 +879,7 @@
   </div>
 </div>
 
-<!-- CONFIRM DELETE -->
+<!-- CONFIRM -->
 <div class="confirm-overlay" id="confirm-overlay">
   <div class="confirm-card">
     <h3 id="confirm-title">Delete?</h3>
@@ -352,574 +891,10 @@
   </div>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast"></div>
-
-<!-- HIDDEN FILE INPUTS -->
 <input type="file" id="box-image-input" accept="image/*" style="display:none" onchange="uploadBoxImage(this)">
 <input type="file" id="item-image-input" accept="image/*" style="display:none" onchange="uploadItemImage(this)">
 
-<script>
-const SUPABASE_URL = 'https://zjzirhiqqqducjxhvdhs.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_Hk1HfakqyFDueOB4-k96wQ_4tut5so-';
-
-let authToken = null;
-let searchTimeout = null;
-let scannerStream = null;
-let scannerInterval = null;
-let currentBox = null;
-let editMode = false;
-let pendingItemImageId = null;
-let nextBarcode = null;
-let lastSearchQuery = '';
-
-// ── INIT ──────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  const saved = sessionStorage.getItem('wh_token');
-  if (saved) { authToken = saved; showApp(); }
-  document.getElementById('password-input').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
-});
-
-// ── AUTH ──────────────────────────────────────────────────
-async function handleLogin() {
-  const email = document.getElementById('email-input').value.trim();
-  const password = document.getElementById('password-input').value;
-  const btn = document.getElementById('login-btn');
-  const err = document.getElementById('auth-error');
-  if (!email || !password) { err.textContent = 'Please enter email and password.'; return; }
-  btn.disabled = true; btn.textContent = 'Signing in…'; err.textContent = '';
-  try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error_description || 'Login failed');
-    authToken = data.access_token;
-    sessionStorage.setItem('wh_token', authToken);
-    showApp();
-  } catch (e) { err.textContent = e.message; }
-  finally { btn.disabled = false; btn.textContent = 'Sign in'; }
-}
-
-function handleLogout() {
-  authToken = null; sessionStorage.removeItem('wh_token');
-  document.getElementById('app-screen').style.display = 'none';
-  document.getElementById('auth-screen').style.display = 'flex';
-  stopScanner();
-}
-
-async function showApp() {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app-screen').style.display = 'block';
-  loadStats();
-}
-
-async function loadStats() {
-  try {
-    const [boxRes, itemRes] = await Promise.all([
-      supaFetch('/rest/v1/boxes?select=box_id&limit=1', { headers: { 'Prefer': 'count=exact' } }),
-      supaFetch('/rest/v1/items?select=id&limit=1', { headers: { 'Prefer': 'count=exact' } })
-    ]);
-    const boxes = boxRes.headers.get('content-range')?.split('/')[1] || '?';
-    const items = itemRes.headers.get('content-range')?.split('/')[1] || '?';
-    document.getElementById('stats-bar').innerHTML = `
-      <div class="stat-chip"><strong>${boxes}</strong> boxes</div>
-      <div class="stat-chip"><strong>${items}</strong> items</div>`;
-  } catch(e) {}
-}
-
-// ── SEARCH ────────────────────────────────────────────────
-function handleSearch(val) {
-  document.getElementById('search-clear').style.display = val ? 'block' : 'none';
-  clearTimeout(searchTimeout);
-  if (!val.trim()) { showEmpty(); return; }
-  searchTimeout = setTimeout(() => searchItems(val.trim()), 300);
-}
-
-function clearSearch() {
-  document.getElementById('search-input').value = '';
-  document.getElementById('search-clear').style.display = 'none';
-  showEmpty();
-}
-
-function showEmpty() {
-  document.getElementById('results-label').textContent = '';
-  document.getElementById('results-container').innerHTML = '';
-}
-
-async function searchItems(query) {
-  const container = document.getElementById('results-container');
-  const label = document.getElementById('results-label');
-  container.innerHTML = '<div class="loading"><div class="spinner"></div>Searching…</div>';
-  try {
-    const enc = encodeURIComponent(`%${query}%`);
-    const [itemsRes, boxesRes] = await Promise.all([
-      supaFetch(`/rest/v1/items?select=item_name,box_id,boxes(box_id,location,description)&item_name=ilike.${enc}&limit=80`),
-      supaFetch(`/rest/v1/boxes?or=(box_id.ilike.${enc},description.ilike.${enc},location.ilike.${enc})&limit=20`)
-    ]);
-    const itemData = await itemsRes.json();
-    const boxData = await boxesRes.json();
-
-    if (!itemData.length && boxData.length === 1) {
-      lastSearchQuery = query; openBox(boxData[0].box_id); container.innerHTML = ''; label.textContent = ''; return;
-    }
-
-    let html = '';
-    if (boxData.length) {
-      html += boxData.map(box => `
-        <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(box.box_id)}')">
-          <div class="result-top">
-            <div class="result-item">📦 ${escHtml(box.description || box.box_id)}</div>
-            <div class="result-box-id">${escHtml(box.box_id)}</div>
-          </div>
-          ${box.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(box.location)}</div></div>` : ''}
-          <div class="result-description">Click to view all contents</div>
-        </div>`).join('');
-    }
-    html += itemData.map(item => `
-      <div class="result-card" onclick="lastSearchQuery='${escHtml(query)}';openBox('${escHtml(item.box_id)}')">
-        <div class="result-top">
-          <div class="result-item">${escHtml(item.item_name)}</div>
-          <div class="result-box-id">${escHtml(item.box_id)}</div>
-        </div>
-        ${item.boxes?.location ? `<div class="result-meta"><div class="result-meta-item">📍 ${escHtml(item.boxes.location)}</div></div>` : ''}
-        ${item.boxes?.description ? `<div class="result-description">${escHtml(item.boxes.description)}</div>` : ''}
-      </div>`).join('');
-
-    const total = itemData.length + boxData.length;
-    if (!total) {
-      label.textContent = '';
-      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>No results for "<strong>${escHtml(query)}</strong>"</p></div>`;
-      return;
-    }
-    label.textContent = `${total} result${total !== 1 ? 's' : ''} for "${query}"`;
-    container.innerHTML = html;
-  } catch(e) {
-    container.innerHTML = `<div class="empty-state"><p>Error searching. Please try again.</p></div>`;
-  }
-}
-
-// ── BOX DETAIL ────────────────────────────────────────────
-async function openBox(boxId) {
-  editMode = false;
-  currentBox = null;
-  document.getElementById('edit-mode-bar').classList.remove('visible');
-  document.getElementById('edit-toggle-btn').textContent = '✏️ Edit';
-  document.getElementById('add-item-section').style.display = 'none';
-  document.getElementById('modal-box-id').textContent = boxId;
-  document.getElementById('modal-title').textContent = 'Loading…';
-  document.getElementById('modal-meta').innerHTML = '';
-  document.getElementById('modal-items').innerHTML = '<li style="color:var(--muted);padding:12px 0;font-size:14px">Loading…</li>';
-  document.getElementById('modal-image-section').innerHTML = '';
-  document.getElementById('modal-overlay').classList.add('open');
-
-  try {
-    const [boxRes, itemsRes] = await Promise.all([
-      supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(boxId)}&limit=1`),
-      supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(boxId)}&select=id,item_name,item_image_url&order=item_name`)
-    ]);
-    const boxes = await boxRes.json();
-    const items = await itemsRes.json();
-    currentBox = boxes[0];
-    if (!currentBox) return;
-    renderBoxDetail(currentBox, items);
-  } catch(e) { document.getElementById('modal-title').textContent = 'Error loading box'; }
-}
-
-function renderBoxDetail(box, items) {
-  document.getElementById('modal-title').innerHTML = highlight(box.description || box.box_id);
-  document.getElementById('modal-box-id').innerHTML = highlight(box.box_id);
-  renderMeta(box);
-  renderImageSection(box);
-  renderItems(items);
-}
-
-function renderMeta(box) {
-  if (editMode) {
-    document.getElementById('modal-meta').innerHTML = `
-      <div class="modal-meta-item">
-        <div class="modal-meta-label">Location</div>
-        <input class="modal-meta-input" id="edit-location" value="${escHtml(box.location || '')}" placeholder="e.g. SR02A" spellcheck="false" onblur="saveBoxField('location', this.value)">
-      </div>
-      <div class="modal-meta-item">
-        <div class="modal-meta-label">Description</div>
-        <input class="modal-meta-input wide" id="edit-description" value="${escHtml(box.description || '')}" placeholder="Box description" spellcheck="true" onblur="saveBoxField('description', this.value)">
-      </div>
-      <div class="modal-meta-item">
-        <div class="modal-meta-label">Barcode</div>
-        <input class="modal-meta-input" id="edit-barcode" value="${escHtml(box.barcode || '')}" placeholder="e.g. 990123" spellcheck="false" onblur="saveBoxField('barcode', this.value)">
-      </div>`;
-  } else {
-    document.getElementById('modal-meta').innerHTML = `
-      ${box.location ? `<div class="modal-meta-item"><div class="modal-meta-label">Location</div><div class="modal-meta-value">${highlight(box.location)}</div></div>` : ''}
-      ${box.description ? `<div class="modal-meta-item"><div class="modal-meta-label">Description</div><div class="modal-meta-value" style="font-family:var(--sans)">${highlight(box.description)}</div></div>` : ''}
-      ${box.barcode ? `<div class="modal-meta-item"><div class="modal-meta-label">Barcode</div><div class="modal-meta-value">${highlight(box.barcode)}</div></div>` : ''}
-      <div class="modal-meta-item"><div class="modal-meta-label">Items</div><div class="modal-meta-value" id="item-count-display">–</div></div>`;
-  }
-}
-
-function renderImageSection(box) {
-  const sec = document.getElementById('modal-image-section');
-  if (box.box_image_url) {
-    sec.innerHTML = `
-      <div class="modal-image-wrap">
-        <img class="modal-image" src="${escHtml(box.box_image_url)}" alt="Box contents" onerror="this.style.display='none'">
-        ${editMode ? `<button class="modal-image-overlay-btn" onclick="document.getElementById('box-image-input').click()">📷 Replace photo</button>` : ''}
-      </div>`;
-  } else if (editMode) {
-    sec.innerHTML = `
-      <div class="modal-image-placeholder">
-        <button class="modal-image-placeholder-btn" onclick="document.getElementById('box-image-input').click()">📷 Add box photo</button>
-      </div>`;
-  } else {
-    sec.innerHTML = '';
-  }
-}
-
-function renderItems(items) {
-  const count = document.getElementById('item-count-display');
-  if (count) count.textContent = items.length;
-  document.getElementById('modal-items').innerHTML = items.length
-    ? items.map(item => renderItemRow(item)).join('')
-    : `<li style="color:var(--muted);padding:12px 0;font-size:14px">No items recorded</li>`;
-}
-
-function renderItemRow(item) {
-  if (editMode) {
-    return `<li class="item-row" id="item-row-${item.id}">
-      <span class="item-dot"></span>
-      <input class="item-name-input" value="${escHtml(item.item_name)}" spellcheck="true"
-        id="item-input-${item.id}"
-        onkeydown="if(event.key==='Enter'){saveItemName(${item.id},this.value)}">
-      <div class="item-actions">
-        <button class="item-btn save" onclick="saveItemName(${item.id}, document.getElementById('item-input-${item.id}').value)" title="Save">✓</button>
-        ${item.item_image_url
-          ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="Replace photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()"><button class="item-btn delete" onclick="deleteItemPhoto(${item.id})" title="Delete photo">🖼✕</button>`
-          : `<button class="item-photo-add" title="Add photo" onclick="pendingItemImageId=${item.id};document.getElementById('item-image-input').click()">+</button>`}
-        <button class="item-btn delete" onclick="confirmDeleteItem(${item.id}, '${escHtml(item.item_name).replace(/'/g,'&#39;')}')" title="Delete item">🗑</button>
-      </div>
-    </li>`;
-  } else {
-    return `<li class="item-row">
-      <span class="item-dot"></span>
-      <span class="item-name-view">${highlight(item.item_name)}</span>
-      ${item.item_image_url ? `<img class="item-photo-thumb" src="${escHtml(item.item_image_url)}" title="View photo" onclick="window.open('${escHtml(item.item_image_url)}','_blank')">` : ''}
-    </li>`;
-  }
-}
-
-// ── EDIT MODE ─────────────────────────────────────────────
-function toggleEditMode() {
-  editMode = !editMode;
-  document.getElementById('edit-toggle-btn').textContent = editMode ? '✓ Done' : '✏️ Edit';
-  document.getElementById('edit-mode-bar').classList.toggle('visible', editMode);
-  document.getElementById('add-item-section').style.display = editMode ? 'block' : 'none';
-  if (currentBox) { renderMeta(currentBox); renderImageSection(currentBox); }
-  refreshItems();
-}
-
-async function refreshItems() {
-  if (!currentBox) return;
-  try {
-    const res = await supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(currentBox.box_id)}&select=id,item_name,item_image_url&order=item_name`);
-    const items = await res.json();
-    renderItems(items);
-  } catch(e) {}
-}
-
-// ── SAVE BOX FIELD ────────────────────────────────────────
-async function saveBoxField(field, value) {
-  if (!currentBox) return;
-  try {
-    const res = await supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ [field]: value.trim() || null })
-    });
-    if (!res.ok) throw new Error();
-    currentBox[field] = value.trim() || null;
-    if (field === 'description') document.getElementById('modal-title').textContent = value.trim() || currentBox.box_id;
-    showToast('Saved ✓');
-  } catch(e) { showToast('Save failed — try again'); }
-}
-
-// ── SAVE ITEM ─────────────────────────────────────────────
-async function saveItemName(itemId, newName) {
-  if (!newName.trim()) { showToast('Item name cannot be empty'); return; }
-  try {
-    const res = await supaFetch(`/rest/v1/items?id=eq.${itemId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ item_name: newName.trim() })
-    });
-    if (!res.ok) throw new Error();
-    showToast('Saved ✓');
-  } catch(e) { showToast('Save failed'); }
-}
-
-// ── ADD ITEM ──────────────────────────────────────────────
-async function addItem() {
-  const input = document.getElementById('new-item-input');
-  const name = input.value.trim();
-  if (!name || !currentBox) return;
-  try {
-    const res = await supaFetch('/rest/v1/items', {
-      method: 'POST',
-      body: JSON.stringify({ box_id: currentBox.box_id, item_name: name, item_image_url: null })
-    });
-    if (!res.ok) throw new Error();
-    input.value = '';
-    input.focus();
-    showToast('Item added ✓');
-    refreshItems();
-    loadStats();
-  } catch(e) { showToast('Failed to add item'); }
-}
-
-// ── DELETE ITEM ───────────────────────────────────────────
-function confirmDeleteItem(itemId, itemName) {
-  showConfirm(
-    'Delete item?',
-    `"${itemName}" will be permanently removed from this box.`,
-    async () => {
-      try {
-        await supaFetch(`/rest/v1/items?id=eq.${itemId}`, { method: 'DELETE' });
-        showToast('Item deleted');
-        refreshItems();
-        loadStats();
-      } catch(e) { showToast('Delete failed'); }
-    }
-  );
-}
-
-// ── DELETE BOX ────────────────────────────────────────────
-function confirmDeleteBox() {
-  if (!currentBox) return;
-  const itemCount = document.getElementById('modal-items').children.length;
-  showConfirm(
-    `Delete ${currentBox.box_id}?`,
-    `This will permanently delete this box and all ${itemCount} items inside it. This cannot be undone.`,
-    async () => {
-      try {
-        await supaFetch(`/rest/v1/items?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, { method: 'DELETE' });
-        await supaFetch(`/rest/v1/boxes?box_id=eq.${encodeURIComponent(currentBox.box_id)}`, { method: 'DELETE' });
-        closeModalDirect();
-        showToast(`${currentBox.box_id} deleted`);
-        loadStats();
-        clearSearch();
-      } catch(e) { showToast('Delete failed'); }
-    }
-  );
-}
-
-// ── ADD BOX ───────────────────────────────────────────────
-async function openAddBox() {
-  nextBarcode = null;
-  document.getElementById('new-box-barcode-preview').style.display = 'none';
-  document.getElementById('new-box-barcode-value').textContent = '—';
-  document.getElementById('new-box-location').value = '';
-  document.getElementById('new-box-description').value = '';
-  document.getElementById('add-box-overlay').classList.add('open');
-
-  // Pre-generate barcode and show it
-  try {
-    const res = await supaFetch('/rest/v1/boxes?select=barcode&barcode=like.99*&order=barcode.desc&limit=200');
-    const data = await res.json();
-    const existing = new Set(data.map(b => b.barcode).filter(Boolean));
-    let candidate = 990000;
-    while (existing.has(String(candidate))) candidate++;
-    // Make sure it stays 6 digits starting with 99
-    if (candidate > 999999) candidate = 990000;
-    nextBarcode = String(candidate);
-    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
-    document.getElementById('new-box-barcode-preview').style.display = 'flex';
-  } catch(e) {
-    nextBarcode = String(990000 + Math.floor(Math.random() * 9000));
-    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
-    document.getElementById('new-box-barcode-preview').style.display = 'flex';
-  }
-}
-
-function closeAddBox() { document.getElementById('add-box-overlay').classList.remove('open'); }
-
-async function createBox() {
-  const location = document.getElementById('new-box-location').value.trim();
-  const description = document.getElementById('new-box-description').value.trim();
-  const btn = document.getElementById('create-box-btn');
-  btn.disabled = true; btn.textContent = 'Creating…';
-
-  try {
-    // Get next box ID
-    const res = await supaFetch('/rest/v1/boxes?select=box_id&order=box_id.desc&limit=200');
-    const data = await res.json();
-    let maxNum = 0;
-    data.forEach(b => { const m = b.box_id.match(/(\d+)/); if (m) maxNum = Math.max(maxNum, parseInt(m[1])); });
-    const newId = `rBox_${String(maxNum + 1).padStart(3, '0')}`;
-
-    const createRes = await supaFetch('/rest/v1/boxes', {
-      method: 'POST',
-      body: JSON.stringify({
-        box_id: newId,
-        location: location || null,
-        description: description || null,
-        barcode: nextBarcode,
-        box_image_url: null
-      })
-    });
-    if (!createRes.ok) throw new Error();
-    closeAddBox();
-    showToast(`${newId} created ✓`);
-    loadStats();
-    openBox(newId);
-  } catch(e) { showToast('Failed to create box — try again'); }
-  finally { btn.disabled = false; btn.textContent = 'Create Box'; }
-}
-
-// ── IMAGE UPLOAD ──────────────────────────────────────────
-async function uploadBoxImage(input) {
-  if (!input.files[0] || !currentBox) return;
-  const file = input.files[0];
-  const ext = file.name.split('.').pop();
-  const path = `boxes/${currentBox.box_id}_${Date.now()}.${ext}`;
-  showToast('Uploading…');
-  try {
-    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/inventory-images/${path}`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': file.type, 'x-upsert': 'true' },
-      body: file
-    });
-    if (!uploadRes.ok) throw new Error();
-    const url = `${SUPABASE_URL}/storage/v1/object/public/inventory-images/${path}`;
-    await saveBoxField('box_image_url', url);
-    currentBox.box_image_url = url;
-    renderImageSection(currentBox);
-    showToast('Photo saved ✓');
-  } catch(e) { showToast('Upload failed — storage bucket not set up yet'); }
-  input.value = '';
-}
-
-async function uploadItemImage(input) {
-  if (!input.files[0] || !pendingItemImageId) return;
-  const file = input.files[0];
-  const ext = file.name.split('.').pop();
-  const path = `items/${pendingItemImageId}_${Date.now()}.${ext}`;
-  showToast('Uploading…');
-  try {
-    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/inventory-images/${path}`, {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': file.type, 'x-upsert': 'true' },
-      body: file
-    });
-    if (!uploadRes.ok) throw new Error();
-    const url = `${SUPABASE_URL}/storage/v1/object/public/inventory-images/${path}`;
-    await supaFetch(`/rest/v1/items?id=eq.${pendingItemImageId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ item_image_url: url })
-    });
-    showToast('Photo saved ✓');
-    refreshItems();
-  } catch(e) { showToast('Upload failed'); }
-  input.value = '';
-  pendingItemImageId = null;
-}
-
-// ── SCANNER ───────────────────────────────────────────────
-async function toggleScanner() {
-  const wrap = document.getElementById('scanner-wrap');
-  if (wrap.style.display === 'block') { stopScanner(); return; }
-  wrap.style.display = 'block';
-  try {
-    scannerStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    document.getElementById('scanner-video').srcObject = scannerStream;
-    scannerInterval = setInterval(() => {
-      const video = document.getElementById('scanner-video');
-      const canvas = document.getElementById('scanner-canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const code = jsQR(imageData.data, imageData.width, imageData.height);
-      if (code) { stopScanner(); lookupBarcode(code.data); }
-    }, 300);
-  } catch(e) { stopScanner(); alert('Camera access denied or not available.'); }
-}
-
-function stopScanner() {
-  clearInterval(scannerInterval);
-  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
-  document.getElementById('scanner-wrap').style.display = 'none';
-}
-
-async function lookupBarcode(barcode) {
-  const clean = barcode.replace(/^\*/, '');
-  try {
-    const res = await supaFetch(`/rest/v1/boxes?barcode=eq.${encodeURIComponent(clean)}&limit=1`);
-    const data = await res.json();
-    data.length ? openBox(data[0].box_id) : alert(`No box found for barcode: ${clean}`);
-  } catch(e) { alert('Error looking up barcode.'); }
-}
-
-// ── MODAL ─────────────────────────────────────────────────
-function closeModalDirect() {
-  document.getElementById('modal-overlay').classList.remove('open');
-  editMode = false; currentBox = null;
-}
-
-// ── CONFIRM ───────────────────────────────────────────────
-function showConfirm(title, message, onOk) {
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-message').textContent = message;
-  document.getElementById('confirm-ok-btn').onclick = () => { closeConfirm(); onOk(); };
-  document.getElementById('confirm-overlay').classList.add('open');
-}
-function closeConfirm() { document.getElementById('confirm-overlay').classList.remove('open'); }
-
-// ── TOAST ─────────────────────────────────────────────────
-let toastTimer;
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-// ── HELPERS ─────────────────────────────────────────────
-function highlight(str) {
-  if (!str) return '';
-  const safe = escHtml(String(str));
-  if (!lastSearchQuery.trim()) return safe;
-  const terms = lastSearchQuery.trim().split(/\s+/).filter(Boolean);
-  let result = safe;
-  terms.forEach(term => {
-    const escaped = escHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    result = result.replace(new RegExp(escaped, 'gi'), m => `<mark style="background:#fff176;border-radius:2px;padding:0 1px">${m}</mark>`);
-  });
-  return result;
-}
-
-async function deleteItemPhoto(itemId) {
-  try {
-    await supaFetch(`/rest/v1/items?id=eq.${itemId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ item_image_url: null })
-    });
-    showToast('Photo removed ✓');
-    refreshItems();
-  } catch(e) { showToast('Failed to remove photo'); }
-}
-
-// ── HELPERS ───────────────────────────────────────────────
-function supaFetch(path, extra = {}) {
-  const { headers: extraHeaders = {}, ...rest } = extra;
-  return fetch(`${SUPABASE_URL}${path}`, {
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json', ...extraHeaders },
-    ...rest
-  });
-}
-function escHtml(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-</script>
 </body>
 </html>
+Done
