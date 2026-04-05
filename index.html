@@ -10,7 +10,7 @@
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, limit } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
 // ── FIREBASE CONFIG ───────────────────────────────────────
 const firebaseConfig = {
@@ -66,7 +66,7 @@ window.handleLogin = async () => {
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch(e) {
-    err.textContent = 'Invalid emails or password.';
+    err.textContent = 'Invalid email or password.';
     btn.disabled = false; btn.textContent = 'Sign in';
   }
 };
@@ -210,10 +210,10 @@ window.openBox = async (boxId) => {
 
     const itemsSnap = await getDocs(query(
       collection(db, 'items'),
-      where('box_id', '==', boxId),
-      orderBy('item_name')
+      where('box_id', '==', boxId)
     ));
     currentItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    currentItems.sort((a, b) => a.item_name.localeCompare(b.item_name));
 
     renderBoxDetail();
   } catch(e) {
@@ -787,7 +787,7 @@ window.pendingItemImageId = pendingItemImageId;
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.0</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.1</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -897,4 +897,3 @@ window.pendingItemImageId = pendingItemImageId;
 
 </body>
 </html>
-Done
