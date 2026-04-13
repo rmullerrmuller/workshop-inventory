@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Workshop Inventory</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/quagga2@0.7.4/dist/quagga.min.js"></script>
+
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
@@ -40,7 +40,6 @@ let searchTimeout = null;
 let scannerStream = null;
 let scannerInterval = null;
 window.pendingItemImageId = null;
-let nextBarcode = null;
 
 // ── AUTH STATE ────────────────────────────────────────────
 onAuthStateChanged(auth, user => {
@@ -413,35 +412,24 @@ window.confirmDeleteBox = () => {
 
 // ── ADD BOX ───────────────────────────────────────────────
 window.openAddBox = async () => {
-  nextBarcode = null;
-  document.getElementById('new-box-barcode-preview').style.display = 'none';
-  document.getElementById('new-box-barcode-value').textContent = '—';
   document.getElementById('new-box-location').value = '';
   document.getElementById('new-box-description').value = '';
+  document.getElementById('new-box-barcode').value = '';
   document.getElementById('add-box-overlay').classList.add('open');
-
+  // Pre-calculate next box number
   try {
     const snap = await getDocs(collection(db, 'boxes'));
-    const barcodes = new Set();
     let maxNum = 0;
     snap.forEach(d => {
-      const b = d.data();
-      if (b.barcode) barcodes.add(b.barcode);
-      const m = (b.box_id || '').match(/(\d+)/);
+      const m = (d.data().box_id || '').match(/(\d+)/);
       if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
     });
     window._nextBoxNum = maxNum + 1;
-
-    let candidate = 990000;
-    while (barcodes.has(String(candidate))) candidate++;
-    nextBarcode = String(candidate);
-    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
-    document.getElementById('new-box-barcode-preview').style.display = 'flex';
   } catch(e) {
-    nextBarcode = String(990000 + Math.floor(Math.random() * 9000));
-    document.getElementById('new-box-barcode-value').textContent = nextBarcode;
-    document.getElementById('new-box-barcode-preview').style.display = 'flex';
+    window._nextBoxNum = 1;
   }
+  // Focus barcode field
+  setTimeout(() => document.getElementById('new-box-barcode').focus(), 100);
 };
 
 window.closeAddBox = () => document.getElementById('add-box-overlay').classList.remove('open');
@@ -449,7 +437,9 @@ window.closeAddBox = () => document.getElementById('add-box-overlay').classList.
 window.createBox = async () => {
   const location = document.getElementById('new-box-location').value.trim();
   const description = document.getElementById('new-box-description').value.trim();
+  const barcode = document.getElementById('new-box-barcode').value.trim();
   const btn = document.getElementById('create-box-btn');
+  if (!barcode) { showToast('Please enter a barcode'); return; }
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
     const newId = `rBox_${String(window._nextBoxNum || 1).padStart(3, '0')}`;
@@ -457,7 +447,7 @@ window.createBox = async () => {
       box_id: newId,
       location: location || null,
       description: description || null,
-      barcode: nextBarcode,
+      barcode: barcode,
       box_image_url: null
     });
     // Also set as document ID for easy lookup
@@ -468,7 +458,7 @@ window.createBox = async () => {
         box_id: newId,
         location: location || null,
         description: description || null,
-        barcode: nextBarcode,
+        barcode: barcode,
         box_image_url: null
       });
     });
@@ -527,53 +517,69 @@ window.uploadItemImage = async (input) => {
 };
 
 // ── SCANNER ───────────────────────────────────────────────
-window.toggleScanner = () => {
+let scannerStream = null;
+let scannerAnimFrame = null;
+let barcodeDetector = null;
+
+window.toggleScanner = async () => {
   const wrap = document.getElementById('scanner-wrap');
   if (wrap.style.display === 'block') { stopScanner(); return; }
   wrap.style.display = 'block';
 
-  Quagga.init({
-    inputStream: {
-      name: 'Live',
-      type: 'LiveStream',
-      target: document.getElementById('scanner-video'),
-      constraints: {
-        facingMode: 'environment',
-        width: { min: 640 },
-        height: { min: 480 },
-      },
-    },
-    decoder: {
-      readers: [
-        'code_128_reader',
-        'code_39_reader',
-        'ean_reader',
-        'ean_8_reader',
-        'upc_reader',
-        'upc_e_reader',
-      ]
-    },
-    locate: true,
-  }, (err) => {
-    if (err) {
-      stopScanner();
-      alert('Camera access denied or not available: ' + err);
-      return;
-    }
-    Quagga.start();
-  });
+  // Check for native BarcodeDetector support
+  const hasNativeDetector = 'BarcodeDetector' in window;
 
-  Quagga.onDetected((data) => {
-    const code = data.codeResult.code;
-    if (code) {
-      stopScanner();
-      lookupBarcode(code);
+  try {
+    scannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    });
+    const video = document.getElementById('scanner-video');
+    video.srcObject = scannerStream;
+    await video.play();
+
+    if (hasNativeDetector) {
+      // Use native BarcodeDetector (best on mobile)
+      barcodeDetector = new BarcodeDetector({
+        formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix']
+      });
+      scanLoop();
+    } else {
+      // Fallback: use canvas + manual scan interval
+      scanLoopFallback();
     }
-  });
+  } catch(e) {
+    stopScanner();
+    alert('Camera access denied or not available.');
+  }
 };
 
+async function scanLoop() {
+  const video = document.getElementById('scanner-video');
+  if (!video.srcObject) return;
+  try {
+    const barcodes = await barcodeDetector.detect(video);
+    if (barcodes.length > 0) {
+      stopScanner();
+      lookupBarcode(barcodes[0].rawValue);
+      return;
+    }
+  } catch(e) {}
+  scannerAnimFrame = requestAnimationFrame(scanLoop);
+}
+
+function scanLoopFallback() {
+  // Fallback for browsers without BarcodeDetector
+  // Just show the camera and add a manual "tap to capture" approach
+  const hint = document.querySelector('.scanner-hint');
+  if (hint) hint.textContent = 'Camera open — try typing the barcode number manually below';
+}
+
 function stopScanner() {
-  Quagga.stop();
+  if (scannerAnimFrame) { cancelAnimationFrame(scannerAnimFrame); scannerAnimFrame = null; }
+  if (scannerStream) { scannerStream.getTracks().forEach(t => t.stop()); scannerStream = null; }
+  barcodeDetector = null;
+  const video = document.getElementById('scanner-video');
+  video.srcObject = null;
   document.getElementById('scanner-wrap').style.display = 'none';
 }
 window.stopScanner = stopScanner;
@@ -822,7 +828,7 @@ window.escHtml = (str) => {
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
-    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.5</span></div>
+    <div class="topbar-logo">⬡ Workshop Inventory <span style="opacity:0.5;font-size:10px">v3.7</span></div>
     <div style="display:flex;gap:8px;align-items:center">
       <button class="btn-icon accent" onclick="openAddBox()">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -846,7 +852,8 @@ window.escHtml = (str) => {
       </button>
       <div id="scanner-wrap">
         <div class="scanner-header"><span>Point camera at barcode</span><button class="scanner-close" onclick="stopScanner()">×</button></div>
-        <div id="scanner-video" style="width:100%;max-height:280px;overflow:hidden"></div>
+        <video id="scanner-video" playsinline autoplay muted style="width:100%;max-height:280px;object-fit:cover;display:block"></video>
+        <canvas id="scanner-canvas" style="display:none"></canvas>
         <div class="scanner-hint">Hold steady — scanning automatically</div>
       </div>
     </div>
@@ -895,8 +902,9 @@ window.escHtml = (str) => {
   <div class="add-box-card">
     <h3>New Box</h3>
     <p class="add-box-subtitle">Barcode and ID assigned automatically</p>
-    <div id="new-box-barcode-preview" class="barcode-preview" style="display:none">
-      <span>Barcode:</span> <strong id="new-box-barcode-value">—</strong>
+    <div class="form-group">
+      <label>Barcode</label>
+      <input type="text" id="new-box-barcode" placeholder="Scan or type barcode number" spellcheck="false" inputmode="numeric">
     </div>
     <div class="form-group">
       <label>Location</label>
@@ -931,4 +939,3 @@ window.escHtml = (str) => {
 
 </body>
 </html>
-
